@@ -62,6 +62,8 @@ typedef int gfp_t;
 #define	__GFP_RECLAIMABLE	__BIT(10)
 #define	__GFP_WAIT		__BIT(11)
 #define	__GFP_ZERO		__BIT(12)
+#define	__GFP_NOMEMALLOC	__BIT(13)
+#define	__GFP_THISNODE		__BIT(14)
 
 /*
  * XXX Linux sez nobody should be using this in new code.  We never

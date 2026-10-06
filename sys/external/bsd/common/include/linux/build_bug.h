@@ -31,12 +31,18 @@
 
 #include <lib/libkern/libkern.h>
 
-/* Required to be false _or_ nonconstant.  */
+/*
+ * Must work inside inline functions.  NetBSD CTASSERT uses a bit-field
+ * width, which rejects some __builtin_constant_p() expressions that
+ * Linux's BUILD_BUG_ON accepts (e.g. TTM_NUM_MEM_TYPES checks).  Use a
+ * sizeof negative-array trick instead.
+ */
 #define	BUILD_BUG_ON(EXPR)						      \
-	CTASSERT(__builtin_choose_expr(__builtin_constant_p(EXPR), !(EXPR), 1))
+	((void)sizeof(char[1 - 2 * !!(__builtin_choose_expr(		      \
+	    __builtin_constant_p(EXPR), (EXPR), 0))]))
 
-/* Required to be constant _and_ true.  XXX Should take optional message.  */
-#define	static_assert(EXPR)		CTASSERT(EXPR)
+/* C11-compatible: optional message argument is ignored. */
+#define	static_assert(EXPR, ...)	CTASSERT(EXPR)
 
 #define	BUILD_BUG()			do {} while (0)
 #define	BUILD_BUG_ON_MSG(EXPR,MSG)	BUILD_BUG_ON(EXPR)

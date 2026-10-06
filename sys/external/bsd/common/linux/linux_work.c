@@ -258,6 +258,13 @@ alloc_workqueue(const char *name, int flags, unsigned max_active)
 	struct workqueue_struct *wq;
 	int error;
 
+	/*
+	 * NetBSD workqueues are single-threaded.  Linux callers often pass
+	 * max_active > 1 for unbound queues; treat that as the default (0).
+	 * I prefer doing it here instead of chasing them in the original code.
+	 */
+	if (max_active > 1)
+		max_active = 0;
 	KASSERT(max_active == 0 || max_active == 1);
 
 	wq = kmem_zalloc(sizeof(*wq), KM_SLEEP);

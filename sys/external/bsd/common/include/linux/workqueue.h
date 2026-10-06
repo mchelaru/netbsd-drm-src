@@ -164,4 +164,12 @@ destroy_work_on_stack(struct work_struct *work)
 {
 }
 
+static inline bool
+queue_work_node(int node, struct workqueue_struct *wq, struct work_struct *work)
+{
+	/* just ignore node for now */
+	(void)node;
+	return queue_work(wq, work);
+}
+
 #endif  /* _LINUX_WORKQUEUE_H_ */

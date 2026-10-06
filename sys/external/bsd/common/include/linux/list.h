@@ -127,6 +127,14 @@ __list_add_between(struct list_head *prev, struct list_head *node,
 	next->prev = node;
 }
 
+/* Linux argument order: (new, prev, next). */
+static inline void
+__list_add(struct list_head *node, struct list_head *prev,
+    struct list_head *next)
+{
+	__list_add_between(prev, node, next);
+}
+
 static inline void
 list_add(struct list_head *node, struct list_head *head)
 {

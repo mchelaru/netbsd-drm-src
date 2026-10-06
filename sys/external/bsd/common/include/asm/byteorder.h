@@ -32,6 +32,8 @@
 #ifndef _ASM_BYTEORDER_H_
 #define _ASM_BYTEORDER_H_
 
+#include <sys/types.h>
+
 #include <sys/endian.h>
 
 #if _BYTE_ORDER == _LITTLE_ENDIAN
@@ -62,5 +64,11 @@
 #define	le16_to_cpup	le16dec
 #define	le32_to_cpup	le32dec
 #define	le64_to_cpup	le64dec
+
+static inline void
+le16_add_cpu(uint16_t *var, uint16_t val)
+{
+	*var = cpu_to_le16(le16_to_cpu(*var) + val);
+}
 
 #endif	/* _ASM_BYTEORDER_H_ */

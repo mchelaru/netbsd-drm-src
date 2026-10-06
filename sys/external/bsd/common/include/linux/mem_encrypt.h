@@ -29,6 +29,12 @@
 #ifndef	_LINUX_MEM_ENCRYPT_H_
 #define	_LINUX_MEM_ENCRYPT_H_
 
+#include <linux/mm_types.h>
+
 #define	mem_encrypt_active()	0
+
+#ifndef pgprot_decrypted
+#define	pgprot_decrypted(prot)	(prot)
+#endif
 
 #endif	/* _LINUX_MEM_ENCRYPT_H_ */

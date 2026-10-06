@@ -66,6 +66,14 @@ __ffs64(uint64_t x)
 	return ffs64(x) - 1;
 }
 
+static inline unsigned long
+__fls(unsigned long x)
+{
+
+	KASSERT(x != 0);
+	return fls64(x) - 1;
+}
+
 /*
  * Linux fls(0) = 0, fls(1) = 1, fls(0x80000000) = 32, so it matches
  * our fls semantics.

@@ -51,5 +51,6 @@
 #define	EREMOTEIO	EIO	/* XXX Urk...  */
 #define	ECHRNG		ERANGE	/* XXX ??? */
 #define	EHWPOISON	EIO
+#define	EBADSLT		EINVAL	/* Linux: Invalid slot */
 
 #endif  /* _LINUX_ERRNO_H_ */

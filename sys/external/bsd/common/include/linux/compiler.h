@@ -39,6 +39,10 @@
 
 #include <asm/barrier.h>
 
+#ifndef __counted_by
+#define	__counted_by(member)	/* GCC 14+ only, not needed in -current */
+#endif
+
 #define	__printf	__printflike
 #define	__user
 #if __GNUC_PREREQ__(4,0)	/* not sure when but this will work */
@@ -49,9 +53,23 @@
 #define	__always_unused	__unused
 #define	__maybe_unused	__unused
 #define	noinline	__noinline
+#define	noinline_for_stack	noinline
+#define	fallthrough	__attribute__((__fallthrough__))
 #define	__deprecated	/* nothing */
 #define	__acquire(X)	/* nothing */
 #define	__release(X)	/* nothing */
+#ifndef __init
+#define	__init		/* nothing */
+#endif
+#ifndef __exit
+#define	__exit		/* nothing */
+#endif
+#ifndef __initdata
+#define	__initdata	/* nothing */
+#endif
+#ifndef __exitdata
+#define	__exitdata	/* nothing */
+#endif
 
 #define	barrier()	__insn_barrier()
 #define	likely(X)	__predict_true(X)

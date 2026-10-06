@@ -46,6 +46,7 @@
 #define	pr_info_ratelimited	printf	/* XXX */
 #define	pr_warn		printf	/* XXX */
 #define	pr_warn_once	printf	/* XXX */
+#define	pr_warn_ratelimited	printf	/* XXX */
 #define	pr_notice	printf	/* XXX */
 #define	pr_debug	aprint_debug
 #define	KERN_EMERG	"emerg: "
@@ -57,6 +58,7 @@
 #define	KERN_INFO	""
 #define	KERN_DEBUG	"debug: "
 #define	KERN_CONT	""
+#define	HW_ERR		"[Hardware Error]: "
 
 #define	printk_ratelimit()	0 /* XXX */
 

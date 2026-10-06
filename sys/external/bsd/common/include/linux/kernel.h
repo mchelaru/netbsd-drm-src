@@ -122,6 +122,9 @@
 
 #define	IS_ALIGNED(X, N)	(((X) & ((N) - 1)) == 0)
 
+/* XXX: this will bite us: linux ALIGN(x, a); overrides netbsd sys/param.h ALIGN(p). */
+#undef ALIGN
+#define	ALIGN(X, N)		round_up((X), (N))
 #define	ALIGN_DOWN(X, N)	round_down(X, N)
 
 /*
