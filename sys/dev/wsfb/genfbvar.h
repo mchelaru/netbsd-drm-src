@@ -122,5 +122,7 @@ int	genfb_borrow(bus_addr_t, bus_space_handle_t *);
 void	genfb_restore_palette(struct genfb_softc *);
 void	genfb_enable_polling(device_t);
 void	genfb_disable_polling(device_t);
+/* Switch console drawing to a new KVA framebuffer */
+void	genfb_rebind_framebuffer(struct genfb_softc *, void *, int);
 
 #endif /* GENFBVAR_H */

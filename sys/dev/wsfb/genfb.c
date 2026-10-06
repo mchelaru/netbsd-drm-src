@@ -1033,6 +1033,21 @@ genfb_disable_polling(device_t dev)
 	}
 }
 
+void
+genfb_rebind_framebuffer(struct genfb_softc *sc, void *fbaddr, int stride)
+{
+
+	if (sc == NULL || fbaddr == NULL)
+		return;
+
+	sc->sc_fbaddr = fbaddr;
+	if (stride > 0)
+		sc->sc_stride = stride;
+
+	/* Updates ri_bits or ri_hwbits on every vcons screen. */
+	vcons_rebind_framebuffer(&sc->vd, fbaddr, stride);
+}
+
 #if GENFB_GLYPHCACHE > 0
 #define GLYPHCACHESIZE ((GENFB_GLYPHCACHE) * 1024 * 1024)
 

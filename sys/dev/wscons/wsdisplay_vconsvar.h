@@ -148,4 +148,7 @@ void	vcons_hard_switch(struct vcons_screen *);
 
 int	vcons_offset_to_zero(const struct vcons_screen *);
 
+/* Rebind all screens' rasops drawing pointers to a new framebuffer. */
+void	vcons_rebind_framebuffer(struct vcons_data *, void *, int);
+
 #endif /* _WSDISPLAY_VCONS_H_ */

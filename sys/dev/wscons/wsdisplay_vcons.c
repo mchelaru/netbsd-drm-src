@@ -1710,6 +1710,53 @@ vcons_hard_switch(struct vcons_screen *scr)
 		vd->show_screen_cb(scr, vd->show_screen_cookie);
 }
 
+void
+vcons_rebind_framebuffer(struct vcons_data *vd, void *fbaddr, int stride)
+{
+	struct vcons_data_private *vdp;
+	struct vcons_screen *scr;
+	struct rasops_info *ri;
+	ptrdiff_t off;
+
+	if (vd == NULL || fbaddr == NULL)
+		return;
+	vdp = vd->private;
+	if (vdp == NULL)
+		return;
+
+	LIST_FOREACH(scr, &vdp->screens, next) {
+		ri = &scr->scr_ri;
+		/*
+		 * With a shadow framebuffer, ri_bits stays on the shadow;
+		 * only the hardware scanout pointer moves.
+		 *
+		 * rasops_eraserows(RI_FULLCLEAR) writes through ri_origbits /
+		 * ri_hworigbits, so both the windowed pointer and its base
+		 * must move together (preserving RI_CENTER margins).
+		 */
+		if (ri->ri_hwbits != NULL) {
+			off = 0;
+			if (ri->ri_hworigbits != NULL)
+				off = ri->ri_hwbits - ri->ri_hworigbits;
+			ri->ri_hworigbits = fbaddr;
+			ri->ri_hwbits = (uint8_t *)fbaddr + off;
+		} else {
+			off = 0;
+			if (ri->ri_origbits != NULL)
+				off = ri->ri_bits - ri->ri_origbits;
+			ri->ri_origbits = fbaddr;
+			ri->ri_bits = (uint8_t *)fbaddr + off;
+		}
+		if (stride > 0 && stride != ri->ri_stride) {
+			ri->ri_stride = stride;
+			if (ri->ri_font != NULL)
+				ri->ri_yscale = ri->ri_font->fontheight *
+				    ri->ri_stride;
+		} else if (stride > 0)
+			ri->ri_stride = stride;
+	}
+}
+
 #ifdef VCONS_DRAW_INTR
 static void
 vcons_invalidate_cache(struct vcons_data *vd)
