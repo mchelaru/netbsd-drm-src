@@ -33,6 +33,7 @@ __KERNEL_RCSID(0, "$NetBSD: amdgpu_mes_v10_1.c,v 1.3 2021/12/19 12:02:39 riastra
 #include "nv.h"
 #include "gc/gc_10_1_0_offset.h"
 #include "gc/gc_10_1_0_sh_mask.h"
+#include <linux/nbsd-namespace.h>
 
 MODULE_FIRMWARE("amdgpu/navi10_mes.bin");
 
@@ -83,25 +84,25 @@ static int mes_v10_1_init_microcode(struct amdgpu_device *adev)
 	}
 
 	snprintf(fw_name, sizeof(fw_name), "amdgpu/%s_mes.bin", chip_name);
-	err = request_firmware(&adev->mes.fw, fw_name, adev->dev);
+	err = request_firmware(&adev->mes.fw[0], fw_name, adev->dev);
 	if (err)
 		return err;
 
-	err = amdgpu_ucode_validate(adev->mes.fw);
+	err = amdgpu_ucode_validate(adev->mes.fw[0]);
 	if (err) {
-		release_firmware(adev->mes.fw);
-		adev->mes.fw = NULL;
+		release_firmware(adev->mes.fw[0]);
+		adev->mes.fw[0] = NULL;
 		return err;
 	}
 
-	mes_hdr = (const struct mes_firmware_header_v1_0 *)adev->mes.fw->data;
-	adev->mes.ucode_fw_version = le32_to_cpu(mes_hdr->mes_ucode_version);
-	adev->mes.ucode_fw_version =
+	mes_hdr = (const struct mes_firmware_header_v1_0 *)adev->mes.fw[0]->data;
+	adev->mes.fw_version[0] = le32_to_cpu(mes_hdr->mes_ucode_version);
+	adev->mes.fw_version[0] =
 		le32_to_cpu(mes_hdr->mes_ucode_data_version);
-	adev->mes.uc_start_addr =
+	adev->mes.uc_start_addr[0] =
 		le32_to_cpu(mes_hdr->mes_uc_start_addr_lo) |
 		((uint64_t)(le32_to_cpu(mes_hdr->mes_uc_start_addr_hi)) << 32);
-	adev->mes.data_start_addr =
+	adev->mes.data_start_addr[0] =
 		le32_to_cpu(mes_hdr->mes_data_start_addr_lo) |
 		((uint64_t)(le32_to_cpu(mes_hdr->mes_data_start_addr_hi)) << 32);
 
@@ -110,8 +111,8 @@ static int mes_v10_1_init_microcode(struct amdgpu_device *adev)
 
 static void mes_v10_1_free_microcode(struct amdgpu_device *adev)
 {
-	release_firmware(adev->mes.fw);
-	adev->mes.fw = NULL;
+	release_firmware(adev->mes.fw[0]);
+	adev->mes.fw[0] = NULL;
 }
 
 static int mes_v10_1_allocate_ucode_buffer(struct amdgpu_device *adev)
@@ -122,26 +123,26 @@ static int mes_v10_1_allocate_ucode_buffer(struct amdgpu_device *adev)
 	unsigned fw_size;
 
 	mes_hdr = (const struct mes_firmware_header_v1_0 *)
-		adev->mes.fw->data;
+		adev->mes.fw[0]->data;
 
-	fw_data = (const __le32 *)(adev->mes.fw->data +
+	fw_data = (const __le32 *)(adev->mes.fw[0]->data +
 		   le32_to_cpu(mes_hdr->mes_ucode_offset_bytes));
 	fw_size = le32_to_cpu(mes_hdr->mes_ucode_size_bytes);
 
 	r = amdgpu_bo_create_reserved(adev, fw_size,
 				      PAGE_SIZE, AMDGPU_GEM_DOMAIN_GTT,
-				      &adev->mes.ucode_fw_obj,
-				      &adev->mes.ucode_fw_gpu_addr,
-				      (void **)&adev->mes.ucode_fw_ptr);
+				      &adev->mes.ucode_fw_obj[0],
+				      &adev->mes.ucode_fw_gpu_addr[0],
+				      (void **)&adev->mes.ucode_fw_ptr[0]);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to create mes fw bo\n", r);
 		return r;
 	}
 
-	memcpy(adev->mes.ucode_fw_ptr, fw_data, fw_size);
+	memcpy(adev->mes.ucode_fw_ptr[0], fw_data, fw_size);
 
-	amdgpu_bo_kunmap(adev->mes.ucode_fw_obj);
-	amdgpu_bo_unreserve(adev->mes.ucode_fw_obj);
+	amdgpu_bo_kunmap(adev->mes.ucode_fw_obj[0]);
+	amdgpu_bo_unreserve(adev->mes.ucode_fw_obj[0]);
 
 	return 0;
 }
@@ -154,39 +155,39 @@ static int mes_v10_1_allocate_ucode_data_buffer(struct amdgpu_device *adev)
 	unsigned fw_size;
 
 	mes_hdr = (const struct mes_firmware_header_v1_0 *)
-		adev->mes.fw->data;
+		adev->mes.fw[0]->data;
 
-	fw_data = (const __le32 *)(adev->mes.fw->data +
+	fw_data = (const __le32 *)(adev->mes.fw[0]->data +
 		   le32_to_cpu(mes_hdr->mes_ucode_data_offset_bytes));
 	fw_size = le32_to_cpu(mes_hdr->mes_ucode_data_size_bytes);
 
 	r = amdgpu_bo_create_reserved(adev, fw_size,
 				      64 * 1024, AMDGPU_GEM_DOMAIN_GTT,
-				      &adev->mes.data_fw_obj,
-				      &adev->mes.data_fw_gpu_addr,
-				      (void **)&adev->mes.data_fw_ptr);
+				      &adev->mes.data_fw_obj[0],
+				      &adev->mes.data_fw_gpu_addr[0],
+				      (void **)&adev->mes.data_fw_ptr[0]);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to create mes data fw bo\n", r);
 		return r;
 	}
 
-	memcpy(adev->mes.data_fw_ptr, fw_data, fw_size);
+	memcpy(adev->mes.data_fw_ptr[0], fw_data, fw_size);
 
-	amdgpu_bo_kunmap(adev->mes.data_fw_obj);
-	amdgpu_bo_unreserve(adev->mes.data_fw_obj);
+	amdgpu_bo_kunmap(adev->mes.data_fw_obj[0]);
+	amdgpu_bo_unreserve(adev->mes.data_fw_obj[0]);
 
 	return 0;
 }
 
 static void mes_v10_1_free_ucode_buffers(struct amdgpu_device *adev)
 {
-	amdgpu_bo_free_kernel(&adev->mes.data_fw_obj,
-			      &adev->mes.data_fw_gpu_addr,
-			      (void **)&adev->mes.data_fw_ptr);
+	amdgpu_bo_free_kernel(&adev->mes.data_fw_obj[0],
+			      &adev->mes.data_fw_gpu_addr[0],
+			      (void **)&adev->mes.data_fw_ptr[0]);
 
-	amdgpu_bo_free_kernel(&adev->mes.ucode_fw_obj,
-			      &adev->mes.ucode_fw_gpu_addr,
-			      (void **)&adev->mes.ucode_fw_ptr);
+	amdgpu_bo_free_kernel(&adev->mes.ucode_fw_obj[0],
+			      &adev->mes.ucode_fw_gpu_addr[0],
+			      (void **)&adev->mes.ucode_fw_ptr[0]);
 }
 
 static void mes_v10_1_enable(struct amdgpu_device *adev, bool enable)
@@ -200,7 +201,7 @@ static void mes_v10_1_enable(struct amdgpu_device *adev, bool enable)
 
 		/* set ucode start address */
 		WREG32_SOC15(GC, 0, mmCP_MES_PRGRM_CNTR_START,
-			     (uint32_t)(adev->mes.uc_start_addr) >> 2);
+			     (uint32_t)(adev->mes.uc_start_addr[0]) >> 2);
 
 		/* clear BYPASS_UNCACHED to avoid hangs after interrupt. */
 		data = RREG32_SOC15(GC, 0, mmCP_MES_DC_OP_CNTL);
@@ -228,7 +229,7 @@ static int mes_v10_1_load_microcode(struct amdgpu_device *adev)
 	int r;
 	uint32_t data;
 
-	if (!adev->mes.fw)
+	if (!adev->mes.fw[0])
 		return -EINVAL;
 
 	r = mes_v10_1_allocate_ucode_buffer(adev);
@@ -251,22 +252,22 @@ static int mes_v10_1_load_microcode(struct amdgpu_device *adev)
 
 	/* set ucode start address */
 	WREG32_SOC15(GC, 0, mmCP_MES_PRGRM_CNTR_START,
-		     (uint32_t)(adev->mes.uc_start_addr) >> 2);
+		     (uint32_t)(adev->mes.uc_start_addr[0]) >> 2);
 
 	/* set ucode fimrware address */
 	WREG32_SOC15(GC, 0, mmCP_MES_IC_BASE_LO,
-		     lower_32_bits(adev->mes.ucode_fw_gpu_addr));
+		     lower_32_bits(adev->mes.ucode_fw_gpu_addr[0]));
 	WREG32_SOC15(GC, 0, mmCP_MES_IC_BASE_HI,
-		     upper_32_bits(adev->mes.ucode_fw_gpu_addr));
+		     upper_32_bits(adev->mes.ucode_fw_gpu_addr[0]));
 
 	/* set ucode instruction cache boundary to 2M-1 */
 	WREG32_SOC15(GC, 0, mmCP_MES_MIBOUND_LO, 0x1FFFFF);
 
 	/* set ucode data firmware address */
 	WREG32_SOC15(GC, 0, mmCP_MES_MDBASE_LO,
-		     lower_32_bits(adev->mes.data_fw_gpu_addr));
+		     lower_32_bits(adev->mes.data_fw_gpu_addr[0]));
 	WREG32_SOC15(GC, 0, mmCP_MES_MDBASE_HI,
-		     upper_32_bits(adev->mes.data_fw_gpu_addr));
+		     upper_32_bits(adev->mes.data_fw_gpu_addr[0]));
 
 	/* Set 0x3FFFF (256K-1) to CP_MES_MDBOUND_LO */
 	WREG32_SOC15(GC, 0, mmCP_MES_MDBOUND_LO, 0x3FFFF);
@@ -288,10 +289,10 @@ static int mes_v10_1_load_microcode(struct amdgpu_device *adev)
 	return 0;
 }
 
-static int mes_v10_1_sw_init(void *handle)
+static int mes_v10_1_sw_init(struct amdgpu_ip_block *ip_block)
 {
 	int r;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	r = mes_v10_1_init_microcode(adev);
 	if (r)
@@ -300,19 +301,19 @@ static int mes_v10_1_sw_init(void *handle)
 	return 0;
 }
 
-static int mes_v10_1_sw_fini(void *handle)
+static int mes_v10_1_sw_fini(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	mes_v10_1_free_microcode(adev);
 
 	return 0;
 }
 
-static int mes_v10_1_hw_init(void *handle)
+static int mes_v10_1_hw_init(struct amdgpu_ip_block *ip_block)
 {
 	int r;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	if (adev->firmware.load_type == AMDGPU_FW_LOAD_DIRECT) {
 		r = mes_v10_1_load_microcode(adev);
@@ -330,9 +331,9 @@ static int mes_v10_1_hw_init(void *handle)
 	return 0;
 }
 
-static int mes_v10_1_hw_fini(void *handle)
+static int mes_v10_1_hw_fini(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	mes_v10_1_enable(adev, false);
 
@@ -342,13 +343,15 @@ static int mes_v10_1_hw_fini(void *handle)
 	return 0;
 }
 
-static int mes_v10_1_suspend(void *handle)
+static int mes_v10_1_suspend(struct amdgpu_ip_block *ip_block)
 {
+	(void)ip_block;
 	return 0;
 }
 
-static int mes_v10_1_resume(void *handle)
+static int mes_v10_1_resume(struct amdgpu_ip_block *ip_block)
 {
+	(void)ip_block;
 	return 0;
 }
 

@@ -1,5 +1,3 @@
-/*	$NetBSD: gfxhub_v1_0.h,v 1.2 2021/12/18 23:44:59 riastradh Exp $	*/
-
 /*
  * Copyright 2016 Advanced Micro Devices, Inc.
  *
@@ -26,13 +24,6 @@
 #ifndef __GFXHUB_V1_0_H__
 #define __GFXHUB_V1_0_H__
 
-int gfxhub_v1_0_gart_enable(struct amdgpu_device *adev);
-void gfxhub_v1_0_gart_disable(struct amdgpu_device *adev);
-void gfxhub_v1_0_set_fault_enable_default(struct amdgpu_device *adev,
-					  bool value);
-void gfxhub_v1_0_init(struct amdgpu_device *adev);
-u64 gfxhub_v1_0_get_mc_fb_offset(struct amdgpu_device *adev);
-void gfxhub_v1_0_setup_vm_pt_regs(struct amdgpu_device *adev, uint32_t vmid,
-				uint64_t page_table_base);
+extern const struct amdgpu_gfxhub_funcs gfxhub_v1_0_funcs;
 
 #endif

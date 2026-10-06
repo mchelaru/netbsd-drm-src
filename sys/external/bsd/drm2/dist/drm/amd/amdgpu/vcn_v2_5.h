@@ -1,5 +1,3 @@
-/*	$NetBSD: vcn_v2_5.h,v 1.2 2021/12/18 23:44:59 riastradh Exp $	*/
-
 /*
  * Copyright 2019 Advanced Micro Devices, Inc.
  *
@@ -26,6 +24,13 @@
 #ifndef __VCN_V2_5_H__
 #define __VCN_V2_5_H__
 
+enum amdgpu_vcn_v2_6_sub_block {
+	AMDGPU_VCN_V2_6_VCPU_VCODEC = 0,
+
+	AMDGPU_VCN_V2_6_MAX_SUB_BLOCK,
+};
+
 extern const struct amdgpu_ip_block_version vcn_v2_5_ip_block;
+extern const struct amdgpu_ip_block_version vcn_v2_6_ip_block;
 
 #endif /* __VCN_V2_5_H__ */

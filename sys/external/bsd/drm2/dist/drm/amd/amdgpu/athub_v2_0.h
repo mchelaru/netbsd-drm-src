@@ -1,5 +1,3 @@
-/*	$NetBSD: athub_v2_0.h,v 1.2 2021/12/18 23:44:58 riastradh Exp $	*/
-
 /*
  * Copyright 2019 Advanced Micro Devices, Inc.
  *
@@ -27,6 +25,6 @@
 
 int athub_v2_0_set_clockgating(struct amdgpu_device *adev,
 			       enum amd_clockgating_state state);
-void athub_v2_0_get_clockgating(struct amdgpu_device *adev, u32 *flags);
+void athub_v2_0_get_clockgating(struct amdgpu_device *adev, u64 *flags);
 
 #endif

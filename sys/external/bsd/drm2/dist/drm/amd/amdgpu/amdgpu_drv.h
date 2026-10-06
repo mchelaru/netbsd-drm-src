@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_drv.h,v 1.3 2021/12/18 23:44:58 riastradh Exp $	*/
-
 /* amdgpu_drv.h -- Private header for amdgpu driver -*- linux-c -*-
  *
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
@@ -42,9 +40,14 @@
 
 #define DRIVER_NAME		"amdgpu"
 #define DRIVER_DESC		"AMD GPU"
-#define DRIVER_DATE		"20150101"
+#define DRIVER_DATE		"20150502"
+
+extern const struct drm_driver amdgpu_partition_driver;
 
 long amdgpu_drm_ioctl(struct file *filp,
 		      unsigned int cmd, unsigned long arg);
+
+long amdgpu_kms_compat_ioctl(struct file *filp,
+			     unsigned int cmd, unsigned long arg);
 
 #endif

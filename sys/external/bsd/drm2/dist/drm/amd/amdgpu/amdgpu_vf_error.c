@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_vf_error.c,v 1.2 2021/12/18 23:44:58 riastradh Exp $	*/
-
 /*
  * Copyright 2017 Advanced Micro Devices, Inc.
  *
@@ -22,9 +20,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  */
-
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_vf_error.c,v 1.2 2021/12/18 23:44:58 riastradh Exp $");
 
 #include "amdgpu.h"
 #include "amdgpu_vf_error.h"
@@ -64,7 +59,7 @@ void amdgpu_vf_error_trans_all(struct amdgpu_device *adev)
 		return;
 	}
 /*
- 	TODO: Enable these code when pv2vf_info is merged
+	TODO: Enable these code when pv2vf_info is merged
 	AMDGPU_FW_VRAM_PF2VF_READ (adev, feature_flags, &pf2vf_flags);
 	if (!(pf2vf_flags & AMDGIM_FEATURE_ERROR_LOG_COLLECT)) {
 		return;

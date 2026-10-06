@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_gem.h,v 1.2 2021/12/18 23:44:58 riastradh Exp $	*/
-
 /*
  * Copyright 2018 Advanced Micro Devices, Inc.
  *
@@ -33,13 +31,16 @@
  */
 
 #define AMDGPU_GEM_DOMAIN_MAX		0x3
+#ifdef __NetBSD__
+/* NetBSD container_of() does not accept nested member designators. */
+#define gem_to_amdgpu_bo(gobj) \
+	container_of((struct ttm_buffer_object *)(gobj), struct amdgpu_bo, tbo)
+#else
 #define gem_to_amdgpu_bo(gobj) container_of((gobj), struct amdgpu_bo, tbo.base)
+#endif
 
-void amdgpu_gem_object_free(struct drm_gem_object *obj);
-int amdgpu_gem_object_open(struct drm_gem_object *obj,
-				struct drm_file *file_priv);
-void amdgpu_gem_object_close(struct drm_gem_object *obj,
-				struct drm_file *file_priv);
+extern const struct drm_gem_object_funcs amdgpu_gem_object_funcs;
+
 unsigned long amdgpu_gem_timeout(uint64_t timeout_ns);
 
 /*
@@ -50,8 +51,7 @@ int amdgpu_gem_object_create(struct amdgpu_device *adev, unsigned long size,
 			     int alignment, u32 initial_domain,
 			     u64 flags, enum ttm_bo_type type,
 			     struct dma_resv *resv,
-			     struct drm_gem_object **obj);
-
+			     struct drm_gem_object **obj, int8_t xcp_id_plus1);
 int amdgpu_mode_dumb_create(struct drm_file *file_priv,
 			    struct drm_device *dev,
 			    struct drm_mode_create_dumb *args);

@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_cgs.c,v 1.7 2021/12/19 10:59:01 riastradh Exp $	*/
-
 /*
  * Copyright 2015 Advanced Micro Devices, Inc.
  *
@@ -23,9 +21,6 @@
  *
  *
  */
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_cgs.c,v 1.7 2021/12/19 10:59:01 riastradh Exp $");
-
 #include <linux/list.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
@@ -48,13 +43,13 @@ struct amdgpu_cgs_device {
 		((struct amdgpu_cgs_device *)cgs_device)->adev
 
 
-static uint32_t amdgpu_cgs_read_register(struct cgs_device *cgs_device, unsigned offset)
+static uint32_t amdgpu_cgs_read_register(struct cgs_device *cgs_device, unsigned int offset)
 {
 	CGS_FUNC_ADEV;
 	return RREG32(offset);
 }
 
-static void amdgpu_cgs_write_register(struct cgs_device *cgs_device, unsigned offset,
+static void amdgpu_cgs_write_register(struct cgs_device *cgs_device, unsigned int offset,
 				      uint32_t value)
 {
 	CGS_FUNC_ADEV;
@@ -63,12 +58,10 @@ static void amdgpu_cgs_write_register(struct cgs_device *cgs_device, unsigned of
 
 static uint32_t amdgpu_cgs_read_ind_register(struct cgs_device *cgs_device,
 					     enum cgs_ind_reg space,
-					     unsigned index)
+					     unsigned int index)
 {
 	CGS_FUNC_ADEV;
 	switch (space) {
-	case CGS_IND_REG__MMIO:
-		return RREG32_IDX(index);
 	case CGS_IND_REG__PCIE:
 		return RREG32_PCIE(index);
 	case CGS_IND_REG__SMC:
@@ -84,6 +77,8 @@ static uint32_t amdgpu_cgs_read_ind_register(struct cgs_device *cgs_device,
 	case CGS_IND_REG__AUDIO_ENDPT:
 		DRM_ERROR("audio endpt register access not implemented.\n");
 		return 0;
+	default:
+		BUG();
 	}
 	WARN(1, "Invalid indirect register space");
 	return 0;
@@ -91,12 +86,10 @@ static uint32_t amdgpu_cgs_read_ind_register(struct cgs_device *cgs_device,
 
 static void amdgpu_cgs_write_ind_register(struct cgs_device *cgs_device,
 					  enum cgs_ind_reg space,
-					  unsigned index, uint32_t value)
+					  unsigned int index, uint32_t value)
 {
 	CGS_FUNC_ADEV;
 	switch (space) {
-	case CGS_IND_REG__MMIO:
-		return WREG32_IDX(index, value);
 	case CGS_IND_REG__PCIE:
 		return WREG32_PCIE(index, value);
 	case CGS_IND_REG__SMC:
@@ -112,6 +105,8 @@ static void amdgpu_cgs_write_ind_register(struct cgs_device *cgs_device,
 	case CGS_IND_REG__AUDIO_ENDPT:
 		DRM_ERROR("audio endpt register access not implemented.\n");
 		return;
+	default:
+		BUG();
 	}
 	WARN(1, "Invalid indirect register space");
 }
@@ -170,38 +165,38 @@ static uint16_t amdgpu_get_firmware_version(struct cgs_device *cgs_device,
 	uint16_t fw_version = 0;
 
 	switch (type) {
-		case CGS_UCODE_ID_SDMA0:
-			fw_version = adev->sdma.instance[0].fw_version;
-			break;
-		case CGS_UCODE_ID_SDMA1:
-			fw_version = adev->sdma.instance[1].fw_version;
-			break;
-		case CGS_UCODE_ID_CP_CE:
-			fw_version = adev->gfx.ce_fw_version;
-			break;
-		case CGS_UCODE_ID_CP_PFP:
-			fw_version = adev->gfx.pfp_fw_version;
-			break;
-		case CGS_UCODE_ID_CP_ME:
-			fw_version = adev->gfx.me_fw_version;
-			break;
-		case CGS_UCODE_ID_CP_MEC:
-			fw_version = adev->gfx.mec_fw_version;
-			break;
-		case CGS_UCODE_ID_CP_MEC_JT1:
-			fw_version = adev->gfx.mec_fw_version;
-			break;
-		case CGS_UCODE_ID_CP_MEC_JT2:
-			fw_version = adev->gfx.mec_fw_version;
-			break;
-		case CGS_UCODE_ID_RLC_G:
-			fw_version = adev->gfx.rlc_fw_version;
-			break;
-		case CGS_UCODE_ID_STORAGE:
-			break;
-		default:
-			DRM_ERROR("firmware type %d do not have version\n", type);
-			break;
+	case CGS_UCODE_ID_SDMA0:
+		fw_version = adev->sdma.instance[0].fw_version;
+		break;
+	case CGS_UCODE_ID_SDMA1:
+		fw_version = adev->sdma.instance[1].fw_version;
+		break;
+	case CGS_UCODE_ID_CP_CE:
+		fw_version = adev->gfx.ce_fw_version;
+		break;
+	case CGS_UCODE_ID_CP_PFP:
+		fw_version = adev->gfx.pfp_fw_version;
+		break;
+	case CGS_UCODE_ID_CP_ME:
+		fw_version = adev->gfx.me_fw_version;
+		break;
+	case CGS_UCODE_ID_CP_MEC:
+		fw_version = adev->gfx.mec_fw_version;
+		break;
+	case CGS_UCODE_ID_CP_MEC_JT1:
+		fw_version = adev->gfx.mec_fw_version;
+		break;
+	case CGS_UCODE_ID_CP_MEC_JT2:
+		fw_version = adev->gfx.mec_fw_version;
+		break;
+	case CGS_UCODE_ID_RLC_G:
+		fw_version = adev->gfx.rlc_fw_version;
+		break;
+	case CGS_UCODE_ID_STORAGE:
+		break;
+	default:
+		DRM_ERROR("firmware type %d do not have version\n", type);
+		break;
 	}
 	return fw_version;
 }
@@ -212,7 +207,7 @@ static int amdgpu_cgs_get_firmware_info(struct cgs_device *cgs_device,
 {
 	CGS_FUNC_ADEV;
 
-	if ((CGS_UCODE_ID_SMU != type) && (CGS_UCODE_ID_SMU_SK != type)) {
+	if (type != CGS_UCODE_ID_SMU && type != CGS_UCODE_ID_SMU_SK) {
 		uint64_t gpu_addr;
 		uint32_t data_size;
 		const struct gfx_firmware_header_v1_0 *header;
@@ -220,6 +215,9 @@ static int amdgpu_cgs_get_firmware_info(struct cgs_device *cgs_device,
 		struct amdgpu_firmware_info *ucode;
 
 		id = fw_type_convert(cgs_device, type);
+		if (id >= AMDGPU_UCODE_ID_MAXIMUM)
+			return -EINVAL;
+
 		ucode = &adev->firmware.ucode[id];
 		if (ucode->fw == NULL)
 			return -EINVAL;
@@ -239,7 +237,7 @@ static int amdgpu_cgs_get_firmware_info(struct cgs_device *cgs_device,
 		info->mc_addr = gpu_addr;
 		info->version = (uint16_t)le32_to_cpu(header->header.ucode_version);
 
-		if (CGS_UCODE_ID_CP_MEC == type)
+		if (type == CGS_UCODE_ID_CP_MEC)
 			info->image_size = le32_to_cpu(header->jt_offset) << 2;
 
 		info->fw_version = amdgpu_get_firmware_version(cgs_device, type);
@@ -251,7 +249,7 @@ static int amdgpu_cgs_get_firmware_info(struct cgs_device *cgs_device,
 		uint32_t ucode_start_address __unused;
 		const uint8_t *src;
 		const struct smc_firmware_header_v1_0 *hdr;
-		const struct common_firmware_header *header;
+		const struct common_firmware_header *header __unused;
 		struct amdgpu_firmware_info *ucode = NULL;
 
 		if (!adev->pm.fw) {
@@ -359,17 +357,10 @@ static int amdgpu_cgs_get_firmware_info(struct cgs_device *cgs_device,
 				break;
 			case CHIP_POLARIS11:
 				if (type == CGS_UCODE_ID_SMU) {
-					if (((adev->pdev->device == 0x67ef) &&
-					     ((adev->pdev->revision == 0xe0) ||
-					      (adev->pdev->revision == 0xe5))) ||
-					    ((adev->pdev->device == 0x67ff) &&
-					     ((adev->pdev->revision == 0xcf) ||
-					      (adev->pdev->revision == 0xef) ||
-					      (adev->pdev->revision == 0xff)))) {
+					if (ASICID_IS_P21(adev->pdev->device, adev->pdev->revision)) {
 						info->is_kicker = true;
 						strcpy(fw_name, "amdgpu/polaris11_k_smc.bin");
-					} else if ((adev->pdev->device == 0x67ef) &&
-						   (adev->pdev->revision == 0xe2)) {
+					} else if (ASICID_IS_P31(adev->pdev->device, adev->pdev->revision)) {
 						info->is_kicker = true;
 						strcpy(fw_name, "amdgpu/polaris11_k2_smc.bin");
 					} else {
@@ -381,21 +372,10 @@ static int amdgpu_cgs_get_firmware_info(struct cgs_device *cgs_device,
 				break;
 			case CHIP_POLARIS10:
 				if (type == CGS_UCODE_ID_SMU) {
-					if (((adev->pdev->device == 0x67df) &&
-					     ((adev->pdev->revision == 0xe0) ||
-					      (adev->pdev->revision == 0xe3) ||
-					      (adev->pdev->revision == 0xe4) ||
-					      (adev->pdev->revision == 0xe5) ||
-					      (adev->pdev->revision == 0xe7) ||
-					      (adev->pdev->revision == 0xef))) ||
-					    ((adev->pdev->device == 0x6fdf) &&
-					     ((adev->pdev->revision == 0xef) ||
-					      (adev->pdev->revision == 0xff)))) {
+					if (ASICID_IS_P20(adev->pdev->device, adev->pdev->revision)) {
 						info->is_kicker = true;
 						strcpy(fw_name, "amdgpu/polaris10_k_smc.bin");
-					} else if ((adev->pdev->device == 0x67df) &&
-						   ((adev->pdev->revision == 0xe1) ||
-						    (adev->pdev->revision == 0xf7))) {
+					} else if (ASICID_IS_P30(adev->pdev->device, adev->pdev->revision)) {
 						info->is_kicker = true;
 						strcpy(fw_name, "amdgpu/polaris10_k2_smc.bin");
 					} else {
@@ -406,13 +386,7 @@ static int amdgpu_cgs_get_firmware_info(struct cgs_device *cgs_device,
 				}
 				break;
 			case CHIP_POLARIS12:
-				if (((adev->pdev->device == 0x6987) &&
-				     ((adev->pdev->revision == 0xc0) ||
-				      (adev->pdev->revision == 0xc3))) ||
-				    ((adev->pdev->device == 0x6981) &&
-				     ((adev->pdev->revision == 0x00) ||
-				      (adev->pdev->revision == 0x01) ||
-				      (adev->pdev->revision == 0x10)))) {
+				if (ASICID_IS_P23(adev->pdev->device, adev->pdev->revision)) {
 					info->is_kicker = true;
 					strcpy(fw_name, "amdgpu/polaris12_k_smc.bin");
 				} else {
@@ -442,17 +416,12 @@ static int amdgpu_cgs_get_firmware_info(struct cgs_device *cgs_device,
 				return -EINVAL;
 			}
 
-			err = request_firmware(&adev->pm.fw, fw_name, adev->dev);
-			if (err) {
-				DRM_ERROR("Failed to request firmware\n");
-				return err;
-			}
-
-			err = amdgpu_ucode_validate(adev->pm.fw);
+			err = amdgpu_ucode_request(adev, &adev->pm.fw,
+						   AMDGPU_UCODE_REQUIRED,
+						   "%s", fw_name);
 			if (err) {
 				DRM_ERROR("Failed to load firmware \"%s\"", fw_name);
-				release_firmware(adev->pm.fw);
-				adev->pm.fw = NULL;
+				amdgpu_ucode_release(&adev->pm.fw);
 				return err;
 			}
 

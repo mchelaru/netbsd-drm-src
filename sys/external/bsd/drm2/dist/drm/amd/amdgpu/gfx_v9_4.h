@@ -1,5 +1,3 @@
-/*	$NetBSD: gfx_v9_4.h,v 1.2 2021/12/18 23:44:59 riastradh Exp $	*/
-
 /*
  * Copyright 2020 Advanced Micro Devices, Inc.
  *
@@ -26,12 +24,6 @@
 #ifndef __GFX_V9_4_H__
 #define __GFX_V9_4_H__
 
-void gfx_v9_4_clear_ras_edc_counter(struct amdgpu_device *adev);
-
-int gfx_v9_4_query_ras_error_count(struct amdgpu_device *adev,
-				   void *ras_error_status);
-
-int gfx_v9_4_ras_error_inject(struct amdgpu_device *adev,
-				     void *inject_if);
+extern struct amdgpu_gfx_ras gfx_v9_4_ras;
 
 #endif /* __GFX_V9_4_H__ */

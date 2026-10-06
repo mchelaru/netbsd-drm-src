@@ -1,5 +1,3 @@
-/*	$NetBSD: nbio_v6_1.h,v 1.2 2021/12/18 23:44:59 riastradh Exp $	*/
-
 /*
  * Copyright 2016 Advanced Micro Devices, Inc.
  *

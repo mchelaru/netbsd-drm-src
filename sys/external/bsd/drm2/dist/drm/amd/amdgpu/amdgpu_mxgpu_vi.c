@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_mxgpu_vi.c,v 1.2 2021/12/18 23:44:58 riastradh Exp $	*/
-
 /*
  * Copyright 2017 Advanced Micro Devices, Inc.
  *
@@ -24,9 +22,6 @@
  * Authors: Xiangliang.Yu@amd.com
  */
 
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_mxgpu_vi.c,v 1.2 2021/12/18 23:44:58 riastradh Exp $");
-
 #include "amdgpu.h"
 #include "vi.h"
 #include "bif/bif_5_0_d.h"
@@ -46,6 +41,8 @@ __KERNEL_RCSID(0, "$NetBSD: amdgpu_mxgpu_vi.c,v 1.2 2021/12/18 23:44:58 riastrad
 #include "dce/dce_10_0_sh_mask.h"
 #include "smu/smu_7_1_3_d.h"
 #include "mxgpu_vi.h"
+
+#include "amdgpu_reset.h"
 
 /* VI golden setting */
 static const u32 xgpu_fiji_mgcg_cgcg_init[] = {
@@ -337,7 +334,7 @@ static void xgpu_vi_mailbox_send_ack(struct amdgpu_device *adev)
 			break;
 		}
 		mdelay(1);
-		timeout -=1;
+		timeout -= 1;
 
 		reg = RREG32_NO_KIQ(mmMAILBOX_CONTROL);
 	}
@@ -518,15 +515,18 @@ static void xgpu_vi_mailbox_flr_work(struct work_struct *work)
 	struct amdgpu_virt *virt = container_of(work, struct amdgpu_virt, flr_work);
 	struct amdgpu_device *adev = container_of(virt, struct amdgpu_device, virt);
 
-	/* wait until RCV_MSG become 3 */
-	if (xgpu_vi_poll_msg(adev, IDH_FLR_NOTIFICATION_CMPL)) {
-		pr_err("failed to receive FLR_CMPL\n");
-		return;
-	}
-
 	/* Trigger recovery due to world switch failure */
-	if (amdgpu_device_should_recover_gpu(adev))
-		amdgpu_device_gpu_recover(adev, NULL);
+	if (amdgpu_device_should_recover_gpu(adev)) {
+		struct amdgpu_reset_context reset_context;
+		memset(&reset_context, 0, sizeof(reset_context));
+
+		reset_context.method = AMD_RESET_METHOD_NONE;
+		reset_context.reset_req_dev = adev;
+		clear_bit(AMDGPU_NEED_FULL_RESET, &reset_context.flags);
+		set_bit(AMDGPU_HOST_FLR, &reset_context.flags);
+
+		amdgpu_device_gpu_recover(adev, NULL, &reset_context);
+	}
 }
 
 static int xgpu_vi_set_mailbox_rcv_irq(struct amdgpu_device *adev,
@@ -549,14 +549,17 @@ static int xgpu_vi_mailbox_rcv_irq(struct amdgpu_device *adev,
 {
 	int r;
 
-	/* trigger gpu-reset by hypervisor only if TDR disbaled */
+	/* trigger gpu-reset by hypervisor only if TDR disabled */
 	if (!amdgpu_gpu_recovery) {
 		/* see what event we get */
 		r = xgpu_vi_mailbox_rcv_msg(adev, IDH_FLR_NOTIFICATION);
 
 		/* only handle FLR_NOTIFY now */
 		if (!r)
-			schedule_work(&adev->virt.flr_work);
+			WARN_ONCE(!amdgpu_reset_domain_schedule(adev->reset_domain,
+								&adev->virt.flr_work),
+				  "Failed to queue work! at %s",
+				  __func__);
 	}
 
 	return 0;

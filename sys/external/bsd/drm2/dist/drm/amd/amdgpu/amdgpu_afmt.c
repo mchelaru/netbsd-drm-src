@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_afmt.c,v 1.3 2021/12/18 23:44:58 riastradh Exp $	*/
-
 /*
  * Copyright 2008 Advanced Micro Devices, Inc.
  * Copyright 2008 Red Hat Inc.
@@ -25,9 +23,6 @@
  *
  * Authors: Christian König
  */
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_afmt.c,v 1.3 2021/12/18 23:44:58 riastradh Exp $");
-
 #include <linux/hdmi.h>
 #include <linux/gcd.h>
 
@@ -105,6 +100,7 @@ struct amdgpu_afmt_acr amdgpu_afmt_acr(uint32_t clock)
 	amdgpu_afmt_calc_cts(clock, &res.cts_32khz, &res.n_32khz, 32000);
 	amdgpu_afmt_calc_cts(clock, &res.cts_44_1khz, &res.n_44_1khz, 44100);
 	amdgpu_afmt_calc_cts(clock, &res.cts_48khz, &res.n_48khz, 48000);
+	res.clock = clock;
 
 	return res;
 }

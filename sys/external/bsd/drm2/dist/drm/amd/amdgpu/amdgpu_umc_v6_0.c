@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_umc_v6_0.c,v 1.2 2021/12/18 23:44:58 riastradh Exp $	*/
-
 /*
  * Copyright 2019 Advanced Micro Devices, Inc.
  *
@@ -22,15 +20,12 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  */
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_umc_v6_0.c,v 1.2 2021/12/18 23:44:58 riastradh Exp $");
-
 #include "umc_v6_0.h"
 #include "amdgpu.h"
 
 static void umc_v6_0_init_registers(struct amdgpu_device *adev)
 {
-	unsigned i,j;
+	unsigned i, j;
 
 	for (i = 0; i < 4; i++)
 		for (j = 0; j < 4; j++)

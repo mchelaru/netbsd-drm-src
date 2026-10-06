@@ -1,5 +1,3 @@
-/*	$NetBSD: smu_v11_0_i2c.h,v 1.2 2021/12/18 23:44:59 riastradh Exp $	*/
-
 /*
  * Copyright 2019 Advanced Micro Devices, Inc.
  *
@@ -28,9 +26,9 @@
 
 #include <linux/types.h>
 
-struct i2c_adapter;
+struct amdgpu_device;
 
-int smu_v11_0_i2c_eeprom_control_init(struct i2c_adapter *control);
-void smu_v11_0_i2c_eeprom_control_fini(struct i2c_adapter *control);
+int smu_v11_0_i2c_control_init(struct amdgpu_device *adev);
+void smu_v11_0_i2c_control_fini(struct amdgpu_device *adev);
 
 #endif

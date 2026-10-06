@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_atombios_dp.c,v 1.4 2021/12/18 23:44:58 riastradh Exp $	*/
-
 /*
  * Copyright 2007-8 Advanced Micro Devices, Inc.
  * Copyright 2008 Red Hat Inc.
@@ -27,10 +25,13 @@
  *          Jerome Glisse
  */
 
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_atombios_dp.c,v 1.4 2021/12/18 23:44:58 riastradh Exp $");
-
 #include <drm/amdgpu_drm.h>
+#ifdef __NetBSD__
+#include <drm/drm_dp_helper.h>
+#else
+#include <drm/display/drm_dp_helper.h>
+#endif
+
 #include "amdgpu.h"
 
 #include "atom.h"
@@ -39,16 +40,15 @@ __KERNEL_RCSID(0, "$NetBSD: amdgpu_atombios_dp.c,v 1.4 2021/12/18 23:44:58 riast
 #include "atombios_dp.h"
 #include "amdgpu_connectors.h"
 #include "amdgpu_atombios.h"
-#include <drm/drm_dp_helper.h>
 
 /* move these to drm_dp_helper.c/h */
 #define DP_LINK_CONFIGURATION_SIZE 9
 #define DP_DPCD_SIZE DP_RECEIVER_CAP_SIZE
 
-static const char *const voltage_names[] = {
+static const char *voltage_names[] = {
 	"0.4V", "0.6V", "0.8V", "1.2V"
 };
-static const char *const pre_emph_names[] = {
+static const char *pre_emph_names[] = {
 	"0dB", "3.5dB", "6dB", "9.5dB"
 };
 
@@ -65,7 +65,7 @@ static int amdgpu_atombios_dp_process_aux_ch(struct amdgpu_i2c_chan *chan,
 				      u8 delay, u8 *ack)
 {
 	struct drm_device *dev = chan->dev;
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 	union aux_channel_transaction args;
 	int index = GetIndexIntoMasterTable(COMMAND, ProcessAuxChannelTransaction);
 	unsigned char *base;
@@ -87,7 +87,7 @@ static int amdgpu_atombios_dp_process_aux_ch(struct amdgpu_i2c_chan *chan,
 	args.v2.ucDelay = delay / 10;
 	args.v2.ucHPD_ID = chan->rec.hpd;
 
-	amdgpu_atom_execute_table(adev->mode_info.atom_context, index, (uint32_t *)&args);
+	amdgpu_atom_execute_table(adev->mode_info.atom_context, index, (uint32_t *)&args, sizeof(args));
 
 	*ack = args.v2.ucReplyStatus;
 
@@ -191,16 +191,12 @@ amdgpu_atombios_dp_aux_transfer(struct drm_dp_aux *aux, struct drm_dp_aux_msg *m
 
 void amdgpu_atombios_dp_aux_init(struct amdgpu_connector *amdgpu_connector)
 {
-	int ret;
-
 	amdgpu_connector->ddc_bus->rec.hpd = amdgpu_connector->hpd.hpd;
-	amdgpu_connector->ddc_bus->aux.dev = amdgpu_connector->base.kdev;
 	amdgpu_connector->ddc_bus->aux.transfer = amdgpu_atombios_dp_aux_transfer;
-	ret = drm_dp_aux_register(&amdgpu_connector->ddc_bus->aux);
-	if (!ret)
-		amdgpu_connector->ddc_bus->has_aux = true;
+	amdgpu_connector->ddc_bus->aux.drm_dev = amdgpu_connector->base.dev;
 
-	WARN(ret, "drm_dp_aux_register_i2c_bus() failed with error %d\n", ret);
+	drm_dp_aux_init(&amdgpu_connector->ddc_bus->aux);
+	amdgpu_connector->ddc_bus->has_aux = true;
 }
 
 /***** general DP utility functions *****/
@@ -309,14 +305,14 @@ static u8 amdgpu_atombios_dp_encoder_service(struct amdgpu_device *adev,
 	args.ucLaneNum = lane_num;
 	args.ucStatus = 0;
 
-	amdgpu_atom_execute_table(adev->mode_info.atom_context, index, (uint32_t *)&args);
+	amdgpu_atom_execute_table(adev->mode_info.atom_context, index, (uint32_t *)&args, sizeof(args));
 	return args.ucStatus;
 }
 
 u8 amdgpu_atombios_dp_get_sinktype(struct amdgpu_connector *amdgpu_connector)
 {
 	struct drm_device *dev = amdgpu_connector->base.dev;
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 
 	return amdgpu_atombios_dp_encoder_service(adev, ATOM_DP_ACTION_GET_SINK_TYPE, 0,
 					   amdgpu_connector->ddc_bus->rec.i2c_id, 0);
@@ -331,12 +327,28 @@ static void amdgpu_atombios_dp_probe_oui(struct amdgpu_connector *amdgpu_connect
 		return;
 
 	if (drm_dp_dpcd_read(&amdgpu_connector->ddc_bus->aux, DP_SINK_OUI, buf, 3) == 3)
-		DRM_DEBUG_KMS("Sink OUI: %02hhx%02hhx%02hhx\n",
+		DRM_DEBUG_KMS("Sink OUI: %02hx%02hx%02hx\n",
 			      buf[0], buf[1], buf[2]);
 
 	if (drm_dp_dpcd_read(&amdgpu_connector->ddc_bus->aux, DP_BRANCH_OUI, buf, 3) == 3)
-		DRM_DEBUG_KMS("Branch OUI: %02hhx%02hhx%02hhx\n",
+		DRM_DEBUG_KMS("Branch OUI: %02hx%02hx%02hx\n",
 			      buf[0], buf[1], buf[2]);
+}
+
+static void amdgpu_atombios_dp_ds_ports(struct amdgpu_connector *amdgpu_connector)
+{
+	struct amdgpu_connector_atom_dig *dig_connector = amdgpu_connector->con_priv;
+	int ret;
+
+	if (dig_connector->dpcd[DP_DPCD_REV] > 0x10) {
+		ret = drm_dp_dpcd_read(&amdgpu_connector->ddc_bus->aux,
+				       DP_DOWNSTREAM_PORT_0,
+				       dig_connector->downstream_ports,
+				       DP_MAX_DOWNSTREAM_PORTS);
+		if (ret)
+			memset(dig_connector->downstream_ports, 0,
+			       DP_MAX_DOWNSTREAM_PORTS);
+	}
 }
 
 int amdgpu_atombios_dp_get_dpcd(struct amdgpu_connector *amdgpu_connector)
@@ -354,7 +366,7 @@ int amdgpu_atombios_dp_get_dpcd(struct amdgpu_connector *amdgpu_connector)
 			      dig_connector->dpcd);
 
 		amdgpu_atombios_dp_probe_oui(amdgpu_connector);
-
+		amdgpu_atombios_dp_ds_ports(amdgpu_connector);
 		return 0;
 	}
 
@@ -713,7 +725,7 @@ void amdgpu_atombios_dp_link_train(struct drm_encoder *encoder,
 			    struct drm_connector *connector)
 {
 	struct drm_device *dev = encoder->dev;
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 	struct amdgpu_encoder *amdgpu_encoder = to_amdgpu_encoder(encoder);
 	struct amdgpu_connector *amdgpu_connector;
 	struct amdgpu_connector_atom_dig *dig_connector;

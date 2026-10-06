@@ -50,12 +50,19 @@ __KERNEL_RCSID(0, "$NetBSD: amdgpu_fb.c,v 1.11 2021/12/20 20:34:58 chs Exp $");
 #include "amdgpufb.h"
 #endif
 
+#include <sys/inttypes.h>
 #include <linux/nbsd-namespace.h>
 
 /* object hierarchy -
    this contains a helper + a amdgpu fb
    the helper contains a pointer to amdgpu framebuffer baseclass.
 */
+
+struct amdgpu_fbdev {
+	struct drm_fb_helper helper;
+	struct amdgpu_framebuffer rfb;
+	struct amdgpu_device *adev;
+};
 
 #ifndef __NetBSD__
 
@@ -147,22 +154,41 @@ static int amdgpufb_create_pinned_object(struct amdgpu_fbdev *rfbdev,
 	int height = mode_cmd->height;
 	u32 cpp;
 	u64 flags = AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED |
-			       AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS     |
-			       AMDGPU_GEM_CREATE_VRAM_CLEARED 	     |
-			       AMDGPU_GEM_CREATE_CPU_GTT_USWC;
+			       AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS |
+			       AMDGPU_GEM_CREATE_VRAM_CLEARED;
 
-	info = drm_get_format_info(adev->ddev, mode_cmd);
+#ifndef __NetBSD__
+	flags |= AMDGPU_GEM_CREATE_CPU_GTT_USWC;
+#endif
+
+	info = drm_get_format_info(adev_to_drm(adev), mode_cmd);
 	cpp = info->cpp[0];
 
 	/* need to align pitch with crtc limits */
 	mode_cmd->pitches[0] = amdgpu_align_pitch(adev, mode_cmd->width, cpp,
 						  fb_tiled);
+#ifdef __NetBSD__
+	/*
+	 * Phoenix APU: visible "VRAM" is carved sysmem with aper_base_kaddr
+	 * mapped WC (amdgpu_ttm_init).  put the console FB there so HUBP
+	 * scans the same 0x80… aperture X uses.  A GTT/GART fbdev BO makes
+	 * prepare_fb fall back to 0x7fff… and the panel stays white even
+	 * though rasops writes succeed.
+	 */
+	domain = AMDGPU_GEM_DOMAIN_VRAM;
+#else
 	domain = amdgpu_display_supported_domains(adev, flags);
+#endif
 	height = ALIGN(mode_cmd->height, 8);
 	size = mode_cmd->pitches[0] * height;
 	aligned_size = ALIGN(size, PAGE_SIZE);
+	/*
+	 * Use ttm_bo_type_device (not kernel): amdgpu_display_get_fb_info →
+	 * amdgpu_bo_get_tiling_flags BUG_ONs on ttm_bo_type_kernel.  Gem
+	 * create still allocates amdgpu_bo_user; type_device matches scanout.
+	 */
 	ret = amdgpu_gem_object_create(adev, aligned_size, 0, domain, flags,
-				       ttm_bo_type_kernel, NULL, &gobj);
+				       ttm_bo_type_device, NULL, &gobj, 0);
 	if (ret) {
 		pr_err("failed to allocate framebuffer (%d)\n", aligned_size);
 		return -ENOMEM;
@@ -201,6 +227,20 @@ static int amdgpufb_create_pinned_object(struct amdgpu_fbdev *rfbdev,
 	if (ret) {
 		goto out_unref;
 	}
+#ifdef __NetBSD__
+	if (amdgpu_bo_kptr(abo) == NULL) {
+		dev_err(adev->dev,
+		    "fbdev VRAM kmap returned NULL (aper_base_kaddr=%p)\n",
+		    adev->mman.aper_base_kaddr);
+		ret = -ENOMEM;
+		goto out_unref;
+	}
+	DRM_INFO("amdgpu: fbdev BO domain=VRAM size=%zu pitch=%u "
+	    "cpu=%p gpu_addr=0x%llx\n",
+	    (size_t)amdgpu_bo_size(abo), mode_cmd->pitches[0],
+	    amdgpu_bo_kptr(abo),
+	    (unsigned long long)amdgpu_bo_gpu_offset(abo));
+#endif
 
 	*gobj_p = gobj;
 	return 0;
@@ -223,6 +263,7 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	int ret;
 	unsigned long tmp;
 
+	memset(&mode_cmd, 0, sizeof(mode_cmd));
 	mode_cmd.width = sizes->surface_width;
 	mode_cmd.height = sizes->surface_height;
 
@@ -249,8 +290,13 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	}
 #endif
 
-	ret = amdgpu_display_framebuffer_init(adev->ddev, &rfbdev->rfb,
-					      &mode_cmd, gobj);
+	/*
+	 * Must fill format/obj and drm_framebuffer_init — bare
+	 * amdgpu_display_framebuffer_init assumes rfb->base.format is set.
+	 */
+	ret = amdgpu_display_kernel_framebuffer_init(adev_to_drm(adev),
+						     &rfbdev->rfb, &mode_cmd,
+						     gobj);
 	if (ret) {
 		DRM_ERROR("failed to initialize framebuffer %d\n", ret);
 		goto out;
@@ -274,8 +320,10 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	afa.afa_fb_ptr = amdgpu_bo_kptr(abo);
 	afa.afa_fb_linebytes = mode_cmd.pitches[0];
 
+	afa.afa_drm_dev = adev_to_drm(adev);
+
 	KERNEL_LOCK(1, NULL);
-	helper->fbdev = config_found(adev->ddev->dev, &afa, NULL,
+	helper->fbdev = config_found(adev->dev, &afa, NULL,
 	    CFARGS(.iattr = "amdgpufbbus"));
 	KERNEL_UNLOCK_ONE(NULL);
 	if (helper->fbdev == NULL) {
@@ -295,7 +343,7 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	drm_fb_helper_fill_info(info, &rfbdev->helper, sizes);
 
 	/* setup aperture base/size for vesafb takeover */
-	info->apertures->ranges[0].base = adev->ddev->mode_config.fb_base;
+	info->apertures->ranges[0].base = adev_to_drm(adev)->mode_config.fb_base;
 	info->apertures->ranges[0].size = adev->gmc.aper_size;
 
 	/* Use default scratch pixmap (info->pixmap.flags = FB_PIXMAP_SYSTEM) */
@@ -311,7 +359,7 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	DRM_INFO("fb depth is %d\n", fb->format->depth);
 	DRM_INFO("   pitch is %d\n", fb->pitches[0]);
 
-	vga_switcheroo_client_fb_set(adev->ddev->pdev, info);
+	vga_switcheroo_client_fb_set(adev_to_drm(adev)->pdev, info);
 #endif
 	return 0;
 
@@ -360,7 +408,7 @@ int amdgpu_fbdev_init(struct amdgpu_device *adev)
 		return 0;
 
 	/* don't init fbdev if there are no connectors */
-	if (list_empty(&adev->ddev->mode_config.connector_list))
+	if (list_empty(&adev_to_drm(adev)->mode_config.connector_list))
 		return 0;
 
 	/* select 8 bpp console on low vram cards */
@@ -374,10 +422,10 @@ int amdgpu_fbdev_init(struct amdgpu_device *adev)
 	rfbdev->adev = adev;
 	adev->mode_info.rfbdev = rfbdev;
 
-	drm_fb_helper_prepare(adev->ddev, &rfbdev->helper,
+	drm_fb_helper_prepare(adev_to_drm(adev), &rfbdev->helper,
 			&amdgpu_fb_helper_funcs);
 
-	ret = drm_fb_helper_init(adev->ddev, &rfbdev->helper,
+	ret = drm_fb_helper_init(adev_to_drm(adev), &rfbdev->helper,
 				 AMDGPUFB_CONN_LIMIT);
 	if (ret) {
 		kfree(rfbdev);
@@ -388,7 +436,7 @@ int amdgpu_fbdev_init(struct amdgpu_device *adev)
 
 	/* disable all the possible outputs/crtcs before entering KMS mode */
 	if (!amdgpu_device_has_dc_support(adev))
-		drm_helper_disable_unused_functions(adev->ddev);
+		drm_helper_disable_unused_functions(adev_to_drm(adev));
 
 	drm_fb_helper_initial_config(&rfbdev->helper, bpp_sel);
 	return 0;
@@ -399,7 +447,7 @@ void amdgpu_fbdev_fini(struct amdgpu_device *adev)
 	if (!adev->mode_info.rfbdev)
 		return;
 
-	amdgpu_fbdev_destroy(adev->ddev, adev->mode_info.rfbdev);
+	amdgpu_fbdev_destroy(adev_to_drm(adev), adev->mode_info.rfbdev);
 	kfree(adev->mode_info.rfbdev);
 	adev->mode_info.rfbdev = NULL;
 }

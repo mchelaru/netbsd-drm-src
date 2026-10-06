@@ -1,5 +1,3 @@
-/*	$NetBSD: vcn_v1_0.h,v 1.2 2021/12/18 23:44:59 riastradh Exp $	*/
-
 /*
  * Copyright 2016 Advanced Micro Devices, Inc.
  *
@@ -26,7 +24,8 @@
 #ifndef __VCN_V1_0_H__
 #define __VCN_V1_0_H__
 
-void vcn_v1_0_ring_begin_use(struct amdgpu_ring *ring);
+void vcn_v1_0_ring_end_use(struct amdgpu_ring *ring);
+void vcn_v1_0_set_pg_for_begin_use(struct amdgpu_ring *ring, bool set_clocks);
 
 extern const struct amdgpu_ip_block_version vcn_v1_0_ip_block;
 

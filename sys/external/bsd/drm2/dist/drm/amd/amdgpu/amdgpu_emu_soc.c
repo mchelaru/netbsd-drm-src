@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_emu_soc.c,v 1.2 2021/12/18 23:44:58 riastradh Exp $	*/
-
 /*
  * Copyright 2018 Advanced Micro Devices, Inc.
  *
@@ -22,9 +20,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  */
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_emu_soc.c,v 1.2 2021/12/18 23:44:58 riastradh Exp $");
-
 #include "amdgpu.h"
 #include "soc15.h"
 

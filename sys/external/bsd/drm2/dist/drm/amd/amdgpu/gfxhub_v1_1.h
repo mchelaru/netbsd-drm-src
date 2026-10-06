@@ -1,5 +1,3 @@
-/*	$NetBSD: gfxhub_v1_1.h,v 1.2 2021/12/18 23:44:59 riastradh Exp $	*/
-
 /*
  * Copyright 2018 Advanced Micro Devices, Inc.
  *

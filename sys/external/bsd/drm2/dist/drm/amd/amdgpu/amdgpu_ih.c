@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_ih.c,v 1.10 2021/12/19 12:29:33 riastradh Exp $	*/
-
 /*
  * Copyright 2014 Advanced Micro Devices, Inc.
  *
@@ -23,13 +21,13 @@
  *
  */
 
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_ih.c,v 1.10 2021/12/19 12:29:33 riastradh Exp $");
-
 #include <linux/dma-mapping.h>
 
 #include "amdgpu.h"
 #include "amdgpu_ih.h"
+
+#include <linux/nbsd-namespace.h>
+
 
 /**
  * amdgpu_ih_ring_init - initialize the IH state
@@ -55,6 +53,13 @@ int amdgpu_ih_ring_init(struct amdgpu_device *adev, struct amdgpu_ih_ring *ih,
 	ih->ring_size = ring_size;
 	ih->ptr_mask = ih->ring_size - 1;
 	ih->rptr = 0;
+#ifdef __NetBSD__
+	/*
+	 * dma_alloc_coherent() is a stub on NetBSD.  Always use a GTT BO
+	 * (same path as PSP-loaded hardware IH rings).
+	 */
+	use_bus_addr = false;
+#endif
 	ih->use_bus_addr = use_bus_addr;
 
 	if (use_bus_addr) {
@@ -66,44 +71,10 @@ int amdgpu_ih_ring_init(struct amdgpu_device *adev, struct amdgpu_ih_ring *ih,
 		/* add 8 bytes for the rptr/wptr shadows and
 		 * add them to the end of the ring allocation.
 		 */
-#ifdef __NetBSD__
-		const bus_size_t size = ih->ring_size + 8;
-		int rseg __diagused;
-		void *kva;
-		r = -bus_dmamem_alloc(adev->ddev->dmat, size, PAGE_SIZE, 0,
-		    &ih->ring_seg, 1, &rseg, BUS_DMA_WAITOK);
-		if (r) {
-fail0:			KASSERT(r);
-			return r;
-		}
-		KASSERT(rseg == 1);
-		r = -bus_dmamap_create(adev->ddev->dmat, size, 1, size, 0,
-		    BUS_DMA_WAITOK, &ih->ring_map);
-		if (r) {
-fail1:			bus_dmamem_free(adev->ddev->dmat, &ih->ring_seg, 1);
-			goto fail0;
-		}
-		r = -bus_dmamem_map(adev->ddev->dmat, &ih->ring_seg, 1, size,
-		    &kva, BUS_DMA_WAITOK|BUS_DMA_COHERENT);
-		if (r) {
-fail2:			bus_dmamap_destroy(adev->ddev->dmat, ih->ring_map);
-			ih->ring_map = NULL;
-			goto fail1;
-		}
-		r = -bus_dmamap_load(adev->ddev->dmat, ih->ring_map, kva, size,
-		    NULL, BUS_DMA_WAITOK);
-		if (r) {
-fail3: __unused		bus_dmamem_unmap(adev->ddev->dmat, kva, size);
-			goto fail2;
-		}
-		ih->ring = kva;
-		dma_addr = ih->ring_map->dm_segs[0].ds_addr;
-#else
 		ih->ring = dma_alloc_coherent(adev->dev, ih->ring_size + 8,
 					      &dma_addr, GFP_KERNEL);
 		if (ih->ring == NULL)
 			return -ENOMEM;
-#endif
 
 		ih->gpu_addr = dma_addr;
 		ih->wptr_addr = dma_addr + ih->ring_size;
@@ -138,6 +109,8 @@ fail3: __unused		bus_dmamem_unmap(adev->ddev->dmat, kva, size);
 		ih->rptr_addr = adev->wb.gpu_addr + rptr_offs * 4;
 		ih->rptr_cpu = &adev->wb.wb[rptr_offs];
 	}
+
+	init_waitqueue_head(&ih->wait_process);
 	return 0;
 }
 
@@ -152,24 +125,17 @@ fail3: __unused		bus_dmamem_unmap(adev->ddev->dmat, kva, size);
  */
 void amdgpu_ih_ring_fini(struct amdgpu_device *adev, struct amdgpu_ih_ring *ih)
 {
+
+	if (!ih->ring)
+		return;
+
 	if (ih->use_bus_addr) {
-		if (!ih->ring)
-			return;
 
 		/* add 8 bytes for the rptr/wptr shadows and
 		 * add them to the end of the ring allocation.
 		 */
-#ifdef __NetBSD__
-		const bus_size_t size = ih->ring_size + 8;
-		void *kva = __UNVOLATILE(ih->ring);
-		bus_dmamap_unload(adev->ddev->dmat, ih->ring_map);
-		bus_dmamem_unmap(adev->ddev->dmat, kva, size);
-		bus_dmamap_destroy(adev->ddev->dmat, ih->ring_map);
-		bus_dmamem_free(adev->ddev->dmat, &ih->ring_seg, 1);
-#else
 		dma_free_coherent(adev->dev, ih->ring_size + 8,
-				  (void *)ih->ring, ih->gpu_addr);
-#endif
+				  (void *)__UNVOLATILE(ih->ring), ih->gpu_addr);
 		ih->ring = NULL;
 	} else {
 		amdgpu_bo_free_kernel(&ih->ring_obj, &ih->gpu_addr,
@@ -177,6 +143,67 @@ void amdgpu_ih_ring_fini(struct amdgpu_device *adev, struct amdgpu_ih_ring *ih)
 		amdgpu_device_wb_free(adev, (ih->wptr_addr - ih->gpu_addr) / 4);
 		amdgpu_device_wb_free(adev, (ih->rptr_addr - ih->gpu_addr) / 4);
 	}
+}
+
+/**
+ * amdgpu_ih_ring_write - write IV to the ring buffer
+ *
+ * @adev: amdgpu_device pointer
+ * @ih: ih ring to write to
+ * @iv: the iv to write
+ * @num_dw: size of the iv in dw
+ *
+ * Writes an IV to the ring buffer using the CPU and increment the wptr.
+ * Used for testing and delegating IVs to a software ring.
+ */
+void amdgpu_ih_ring_write(struct amdgpu_device *adev, struct amdgpu_ih_ring *ih,
+			  const uint32_t *iv, unsigned int num_dw)
+{
+	uint32_t wptr = le32_to_cpu(*ih->wptr_cpu) >> 2;
+	unsigned int i;
+
+	for (i = 0; i < num_dw; ++i)
+	        ih->ring[wptr++] = cpu_to_le32(iv[i]);
+
+	wptr <<= 2;
+	wptr &= ih->ptr_mask;
+
+	/* Only commit the new wptr if we don't overflow */
+	if (wptr != READ_ONCE(ih->rptr)) {
+		wmb();
+		WRITE_ONCE(*ih->wptr_cpu, cpu_to_le32(wptr));
+	} else if (adev->irq.retry_cam_enabled) {
+		dev_warn_once(adev->dev, "IH soft ring buffer overflow 0x%X, 0x%X\n",
+			      wptr, ih->rptr);
+	}
+}
+
+/**
+ * amdgpu_ih_wait_on_checkpoint_process_ts - wait to process IVs up to checkpoint
+ *
+ * @adev: amdgpu_device pointer
+ * @ih: ih ring to process
+ *
+ * Used to ensure ring has processed IVs up to the checkpoint write pointer.
+ */
+int amdgpu_ih_wait_on_checkpoint_process_ts(struct amdgpu_device *adev,
+					struct amdgpu_ih_ring *ih)
+{
+	uint32_t checkpoint_wptr;
+	uint64_t checkpoint_ts;
+	long timeout = HZ;
+
+	if (!ih->enabled || adev->shutdown)
+		return -ENODEV;
+
+	checkpoint_wptr = amdgpu_ih_get_wptr(adev, ih);
+	/* Order wptr with ring data. */
+	rmb();
+	checkpoint_ts = amdgpu_ih_decode_iv_ts(adev, ih, checkpoint_wptr, -1);
+
+	return wait_event_interruptible_timeout(ih->wait_process,
+		    amdgpu_ih_ts_after(checkpoint_ts, ih->processed_timestamp) ||
+		    ih->rptr == amdgpu_ih_get_wptr(adev, ih), timeout);
 }
 
 /**
@@ -190,7 +217,7 @@ void amdgpu_ih_ring_fini(struct amdgpu_device *adev, struct amdgpu_ih_ring *ih)
  */
 int amdgpu_ih_process(struct amdgpu_device *adev, struct amdgpu_ih_ring *ih)
 {
-	unsigned int count = AMDGPU_IH_MAX_NUM_IVS;
+	unsigned int count;
 	u32 wptr;
 
 	if (!ih->enabled || adev->shutdown)
@@ -199,10 +226,7 @@ int amdgpu_ih_process(struct amdgpu_device *adev, struct amdgpu_ih_ring *ih)
 	wptr = amdgpu_ih_get_wptr(adev, ih);
 
 restart_ih:
-	/* is somebody else already processing irqs? */
-	if (atomic_xchg(&ih->lock, 1))
-		return IRQ_NONE;
-
+	count  = AMDGPU_IH_MAX_NUM_IVS;
 	DRM_DEBUG("%s: rptr %d, wptr %d\n", __func__, ih->rptr, wptr);
 
 	/* Order reading of wptr vs. reading of IH ring data */
@@ -214,7 +238,7 @@ restart_ih:
 	}
 
 	amdgpu_ih_set_rptr(adev, ih);
-	atomic_set(&ih->lock, 0);
+	wake_up_all(&ih->wait_process);
 
 	/* make sure wptr hasn't changed while processing */
 	wptr = amdgpu_ih_get_wptr(adev, ih);
@@ -224,3 +248,69 @@ restart_ih:
 	return IRQ_HANDLED;
 }
 
+/**
+ * amdgpu_ih_decode_iv_helper - decode an interrupt vector
+ *
+ * @adev: amdgpu_device pointer
+ * @ih: ih ring to process
+ * @entry: IV entry
+ *
+ * Decodes the interrupt vector at the current rptr
+ * position and also advance the position for Vega10
+ * and later GPUs.
+ */
+void amdgpu_ih_decode_iv_helper(struct amdgpu_device *adev,
+				struct amdgpu_ih_ring *ih,
+				struct amdgpu_iv_entry *entry)
+{
+	/* wptr/rptr are in bytes! */
+	u32 ring_index = ih->rptr >> 2;
+	uint32_t dw[8];
+
+	dw[0] = le32_to_cpu(ih->ring[ring_index + 0]);
+	dw[1] = le32_to_cpu(ih->ring[ring_index + 1]);
+	dw[2] = le32_to_cpu(ih->ring[ring_index + 2]);
+	dw[3] = le32_to_cpu(ih->ring[ring_index + 3]);
+	dw[4] = le32_to_cpu(ih->ring[ring_index + 4]);
+	dw[5] = le32_to_cpu(ih->ring[ring_index + 5]);
+	dw[6] = le32_to_cpu(ih->ring[ring_index + 6]);
+	dw[7] = le32_to_cpu(ih->ring[ring_index + 7]);
+
+	entry->client_id = dw[0] & 0xff;
+	entry->src_id = (dw[0] >> 8) & 0xff;
+	entry->ring_id = (dw[0] >> 16) & 0xff;
+	entry->vmid = (dw[0] >> 24) & 0xf;
+	entry->vmid_src = (dw[0] >> 31);
+	entry->timestamp = dw[1] | ((u64)(dw[2] & 0xffff) << 32);
+	entry->timestamp_src = dw[2] >> 31;
+	entry->pasid = dw[3] & 0xffff;
+	entry->node_id = (dw[3] >> 16) & 0xff;
+	entry->src_data[0] = dw[4];
+	entry->src_data[1] = dw[5];
+	entry->src_data[2] = dw[6];
+	entry->src_data[3] = dw[7];
+
+	/* wptr/rptr are in bytes! */
+	ih->rptr += 32;
+}
+
+uint64_t amdgpu_ih_decode_iv_ts_helper(struct amdgpu_ih_ring *ih, u32 rptr,
+				       signed int offset)
+{
+	uint32_t iv_size = 32;
+	uint32_t ring_index;
+	uint32_t dw1, dw2;
+
+	rptr += iv_size * offset;
+	ring_index = (rptr & ih->ptr_mask) >> 2;
+
+	dw1 = le32_to_cpu(ih->ring[ring_index + 1]);
+	dw2 = le32_to_cpu(ih->ring[ring_index + 2]);
+	return dw1 | ((u64)(dw2 & 0xffff) << 32);
+}
+
+const char *amdgpu_ih_ring_name(struct amdgpu_device *adev, struct amdgpu_ih_ring *ih)
+{
+	return ih == &adev->irq.ih ? "ih" : ih == &adev->irq.ih_soft ? "sw ih" :
+	       ih == &adev->irq.ih1 ? "ih1" : ih == &adev->irq.ih2 ? "ih2" : "unknown";
+}

@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_sched.h,v 1.2 2021/12/18 23:44:58 riastradh Exp $	*/
-
 /*
  * Copyright 2017 Valve Corporation
  *
@@ -32,7 +30,8 @@ enum drm_sched_priority;
 struct drm_device;
 struct drm_file;
 
-enum drm_sched_priority amdgpu_to_sched_priority(int amdgpu_priority);
+int amdgpu_to_sched_priority(int amdgpu_priority,
+			     enum drm_sched_priority *prio);
 int amdgpu_sched_ioctl(struct drm_device *dev, void *data,
 		       struct drm_file *filp);
 

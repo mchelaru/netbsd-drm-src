@@ -43,6 +43,13 @@ __KERNEL_RCSID(0, "$NetBSD: amdgpu_si_dpm.c,v 1.3 2021/12/19 12:21:29 riastradh 
 #include <linux/seq_file.h>
 #include <linux/firmware.h>
 
+#include <linux/nbsd-namespace.h>
+#ifdef __NetBSD__
+/* NetBSD ALIGN(p) is 1-arg; Linux ALIGN(x,a) is 2-arg. */
+#undef ALIGN
+#define	ALIGN(x, a)	round_up((x), (a))
+#endif
+
 #define MC_CG_ARB_FREQ_F0           0x0a
 #define MC_CG_ARB_FREQ_F1           0x0b
 #define MC_CG_ARB_FREQ_F2           0x0c
@@ -6565,7 +6572,7 @@ static int si_fan_ctrl_stop_smc_fan_control(struct amdgpu_device *adev)
 	}
 }
 
-static int si_dpm_get_fan_speed_percent(void *handle,
+static int si_dpm_get_fan_speed_pwm(void *handle,
 				      u32 *speed)
 {
 	u32 duty, duty100;
@@ -6591,7 +6598,7 @@ static int si_dpm_get_fan_speed_percent(void *handle,
 	return 0;
 }
 
-static int si_dpm_set_fan_speed_percent(void *handle,
+static int si_dpm_set_fan_speed_pwm(void *handle,
 				      u32 speed)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
@@ -6625,7 +6632,7 @@ static int si_dpm_set_fan_speed_percent(void *handle,
 	return 0;
 }
 
-static void si_dpm_set_fan_control_mode(void *handle, u32 mode)
+static int si_dpm_set_fan_control_mode(void *handle, u32 mode)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
@@ -6641,19 +6648,23 @@ static void si_dpm_set_fan_control_mode(void *handle, u32 mode)
 		else
 			si_fan_ctrl_set_default_mode(adev);
 	}
+	return 0;
 }
 
-static u32 si_dpm_get_fan_control_mode(void *handle)
+static int si_dpm_get_fan_control_mode(void *handle, u32 *fan_mode)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct si_power_info *si_pi = si_get_pi(adev);
 	u32 tmp;
 
-	if (si_pi->fan_is_controlled_by_smc)
+	if (si_pi->fan_is_controlled_by_smc) {
+		*fan_mode = 0;
 		return 0;
+	}
 
 	tmp = RREG32(CG_FDO_CTRL2) & FDO_PWM_MODE_MASK;
-	return (tmp >> FDO_PWM_MODE_SHIFT);
+	*fan_mode = (tmp >> FDO_PWM_MODE_SHIFT);
+	return 0;
 }
 
 #if 0
@@ -7586,10 +7597,10 @@ static int si_dpm_process_interrupt(struct amdgpu_device *adev,
 	return 0;
 }
 
-static int si_dpm_late_init(void *handle)
+static int si_dpm_late_init(struct amdgpu_ip_block *ip_block)
 {
 	int ret;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	if (!adev->pm.dpm_enabled)
 		return 0;
@@ -7692,10 +7703,10 @@ out:
 
 }
 
-static int si_dpm_sw_init(void *handle)
+static int si_dpm_sw_init(struct amdgpu_ip_block *ip_block)
 {
 	int ret;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	ret = amdgpu_irq_add_id(adev, AMDGPU_IRQ_CLIENTID_LEGACY, 230, &adev->pm.dpm.thermal.irq);
 	if (ret)
@@ -7742,9 +7753,9 @@ dpm_failed:
 	return ret;
 }
 
-static int si_dpm_sw_fini(void *handle)
+static int si_dpm_sw_fini(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	flush_work(&adev->pm.dpm.thermal.work);
 
@@ -7755,11 +7766,11 @@ static int si_dpm_sw_fini(void *handle)
 	return 0;
 }
 
-static int si_dpm_hw_init(void *handle)
+static int si_dpm_hw_init(struct amdgpu_ip_block *ip_block)
 {
 	int ret;
 
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	if (!amdgpu_dpm)
 		return 0;
@@ -7776,9 +7787,9 @@ static int si_dpm_hw_init(void *handle)
 	return ret;
 }
 
-static int si_dpm_hw_fini(void *handle)
+static int si_dpm_hw_fini(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	if (adev->pm.dpm_enabled) {
 		mutex_lock(&adev->pm.mutex);
@@ -7789,9 +7800,9 @@ static int si_dpm_hw_fini(void *handle)
 	return 0;
 }
 
-static int si_dpm_suspend(void *handle)
+static int si_dpm_suspend(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	if (adev->pm.dpm_enabled) {
 		mutex_lock(&adev->pm.mutex);
@@ -7804,10 +7815,10 @@ static int si_dpm_suspend(void *handle)
 	return 0;
 }
 
-static int si_dpm_resume(void *handle)
+static int si_dpm_resume(struct amdgpu_ip_block *ip_block)
 {
 	int ret;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	if (adev->pm.dpm_enabled) {
 		/* asic init will reset to the boot state */
@@ -7828,27 +7839,28 @@ static int si_dpm_resume(void *handle)
 static bool si_dpm_is_idle(void *handle)
 {
 	/* XXX */
+	(void)handle;
 	return true;
 }
 
-static int si_dpm_wait_for_idle(void *handle)
+static int si_dpm_wait_for_idle(struct amdgpu_ip_block *ip_block)
 {
 	/* XXX */
 	return 0;
 }
 
-static int si_dpm_soft_reset(void *handle)
+static int si_dpm_soft_reset(struct amdgpu_ip_block *ip_block)
 {
 	return 0;
 }
 
-static int si_dpm_set_clockgating_state(void *handle,
+static int si_dpm_set_clockgating_state(struct amdgpu_ip_block *ip_block,
 					enum amd_clockgating_state state)
 {
 	return 0;
 }
 
-static int si_dpm_set_powergating_state(void *handle,
+static int si_dpm_set_powergating_state(struct amdgpu_ip_block *ip_block,
 					enum amd_powergating_state state)
 {
 	return 0;
@@ -7922,10 +7934,10 @@ static void si_dpm_print_power_state(void *handle,
 	amdgpu_dpm_print_ps_status(adev, rps);
 }
 
-static int si_dpm_early_init(void *handle)
+static int si_dpm_early_init(struct amdgpu_ip_block *ip_block)
 {
 
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	adev->powerplay.pp_funcs = &si_dpm_funcs;
 	adev->powerplay.pp_handle = adev;
@@ -8068,8 +8080,8 @@ static const struct amd_pm_funcs si_dpm_funcs = {
 	.vblank_too_short = &si_dpm_vblank_too_short,
 	.set_fan_control_mode = &si_dpm_set_fan_control_mode,
 	.get_fan_control_mode = &si_dpm_get_fan_control_mode,
-	.set_fan_speed_percent = &si_dpm_set_fan_speed_percent,
-	.get_fan_speed_percent = &si_dpm_get_fan_speed_percent,
+	.set_fan_speed_pwm = &si_dpm_set_fan_speed_pwm,
+	.get_fan_speed_pwm = &si_dpm_get_fan_speed_pwm,
 	.check_state_equal = &si_check_state_equal,
 	.get_vce_clock_state = amdgpu_get_vce_clock_state,
 	.read_sensor = &si_dpm_read_sensor,

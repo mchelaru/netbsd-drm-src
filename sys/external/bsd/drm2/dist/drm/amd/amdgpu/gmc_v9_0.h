@@ -1,5 +1,3 @@
-/*	$NetBSD: gmc_v9_0.h,v 1.2 2021/12/18 23:44:59 riastradh Exp $	*/
-
 /*
  * Copyright 2016 Advanced Micro Devices, Inc.
  *
@@ -28,4 +26,6 @@
 
 extern const struct amd_ip_funcs gmc_v9_0_ip_funcs;
 extern const struct amdgpu_ip_block_version gmc_v9_0_ip_block;
+
+void gmc_v9_0_restore_registers(struct amdgpu_device *adev);
 #endif

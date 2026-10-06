@@ -1,5 +1,3 @@
-/*	$NetBSD: gfx_v7_0.h,v 1.3 2021/12/18 23:44:59 riastradh Exp $	*/
-
 /*
  * Copyright 2014 Advanced Micro Devices, Inc.
  *
@@ -26,7 +24,6 @@
 #ifndef __GFX_V7_0_H__
 #define __GFX_V7_0_H__
 
-extern const struct amdgpu_ip_block_version gfx_v7_0_ip_block;
 extern const struct amdgpu_ip_block_version gfx_v7_1_ip_block;
 extern const struct amdgpu_ip_block_version gfx_v7_2_ip_block;
 extern const struct amdgpu_ip_block_version gfx_v7_3_ip_block;

@@ -1,5 +1,3 @@
-/*	$NetBSD: nbio_v7_4.h,v 1.2 2021/12/18 23:44:59 riastradh Exp $	*/
-
 /*
  * Copyright 2018 Advanced Micro Devices, Inc.
  *
@@ -30,5 +28,6 @@
 
 extern const struct nbio_hdp_flush_reg nbio_v7_4_hdp_flush_reg;
 extern const struct amdgpu_nbio_funcs nbio_v7_4_funcs;
+extern struct amdgpu_nbio_ras nbio_v7_4_ras;
 
 #endif

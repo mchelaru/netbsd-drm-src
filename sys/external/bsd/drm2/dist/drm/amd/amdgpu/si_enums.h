@@ -1,5 +1,3 @@
-/*	$NetBSD: si_enums.h,v 1.2 2021/12/18 23:44:59 riastradh Exp $	*/
-
 /*
  * Copyright 2016 Advanced Micro Devices, Inc.
  *
@@ -123,7 +121,6 @@
 #define CURSOR_UPDATE_LOCK             (1 << 16)
 #define CURSOR_DISABLE_MULTIPLE_UPDATE (1 << 24)
 
-#define AMDGPU_NUM_OF_VMIDS                     8
 #define SI_CRTC0_REGISTER_OFFSET                0
 #define SI_CRTC1_REGISTER_OFFSET                0x300
 #define SI_CRTC2_REGISTER_OFFSET                0x2600

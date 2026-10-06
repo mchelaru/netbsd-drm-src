@@ -1,5 +1,3 @@
-/*	$NetBSD: mxgpu_vi.h,v 1.2 2021/12/18 23:44:59 riastradh Exp $	*/
-
 /*
  * Copyright 2017 Advanced Micro Devices, Inc.
  *
@@ -45,7 +43,8 @@ enum idh_event {
 	IDH_READY_TO_ACCESS_GPU,
 	IDH_FLR_NOTIFICATION,
 	IDH_FLR_NOTIFICATION_CMPL,
-	IDH_EVENT_MAX
+
+	IDH_TEXT_MESSAGE = 255
 };
 
 extern const struct amdgpu_virt_ops xgpu_vi_virt_ops;

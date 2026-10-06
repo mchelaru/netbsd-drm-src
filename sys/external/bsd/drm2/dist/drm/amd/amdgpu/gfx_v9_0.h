@@ -1,5 +1,3 @@
-/*	$NetBSD: gfx_v9_0.h,v 1.2 2021/12/18 23:44:59 riastradh Exp $	*/
-
 /*
  * Copyright 2016 Advanced Micro Devices, Inc.
  *
@@ -28,9 +26,7 @@
 
 extern const struct amdgpu_ip_block_version gfx_v9_0_ip_block;
 
-void gfx_v9_0_select_se_sh(struct amdgpu_device *adev, u32 se_num, u32 sh_num);
-
-uint64_t gfx_v9_0_get_gpu_clock_counter(struct amdgpu_device *adev);
-int gfx_v9_0_get_cu_info(struct amdgpu_device *adev, struct amdgpu_cu_info *cu_info);
+void gfx_v9_0_select_se_sh(struct amdgpu_device *adev, u32 se_num, u32 sh_num,
+			   u32 instance, int xcc_id);
 
 #endif

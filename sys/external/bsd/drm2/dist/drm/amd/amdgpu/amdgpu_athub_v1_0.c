@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_athub_v1_0.c,v 1.2 2021/12/18 23:44:58 riastradh Exp $	*/
-
 /*
  * Copyright 2016 Advanced Micro Devices, Inc.
  *
@@ -22,9 +20,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  */
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_athub_v1_0.c,v 1.2 2021/12/18 23:44:58 riastradh Exp $");
-
 #include "amdgpu.h"
 #include "athub_v1_0.h"
 
@@ -73,11 +68,13 @@ int athub_v1_0_set_clockgating(struct amdgpu_device *adev,
 	if (amdgpu_sriov_vf(adev))
 		return 0;
 
-	switch (adev->asic_type) {
-	case CHIP_VEGA10:
-	case CHIP_VEGA12:
-	case CHIP_VEGA20:
-	case CHIP_RAVEN:
+	switch (amdgpu_ip_version(adev, ATHUB_HWIP, 0)) {
+	case IP_VERSION(9, 0, 0):
+	case IP_VERSION(9, 1, 0):
+	case IP_VERSION(9, 2, 0):
+	case IP_VERSION(9, 3, 0):
+	case IP_VERSION(9, 4, 0):
+	case IP_VERSION(1, 5, 0):
 		athub_update_medium_grain_clock_gating(adev,
 				state == AMD_CG_STATE_GATE);
 		athub_update_medium_grain_light_sleep(adev,
@@ -90,7 +87,7 @@ int athub_v1_0_set_clockgating(struct amdgpu_device *adev,
 	return 0;
 }
 
-void athub_v1_0_get_clockgating(struct amdgpu_device *adev, u32 *flags)
+void athub_v1_0_get_clockgating(struct amdgpu_device *adev, u64 *flags)
 {
 	int data;
 

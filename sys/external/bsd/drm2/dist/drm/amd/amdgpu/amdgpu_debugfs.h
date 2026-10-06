@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_debugfs.h,v 1.2 2021/12/18 23:44:58 riastradh Exp $	*/
-
 /*
  * Copyright 2008 Advanced Micro Devices, Inc.
  * Copyright 2008 Red Hat Inc.
@@ -24,22 +22,15 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  */
-
 /*
  * Debugfs
  */
-struct amdgpu_debugfs {
-	const struct drm_info_list	*files;
-	unsigned		num_files;
-};
 
 int amdgpu_debugfs_regs_init(struct amdgpu_device *adev);
-void amdgpu_debugfs_regs_cleanup(struct amdgpu_device *adev);
 int amdgpu_debugfs_init(struct amdgpu_device *adev);
-void amdgpu_debugfs_preempt_cleanup(struct amdgpu_device *adev);
-int amdgpu_debugfs_add_files(struct amdgpu_device *adev,
-			     const struct drm_info_list *files,
-			     unsigned nfiles);
-int amdgpu_debugfs_fence_init(struct amdgpu_device *adev);
-int amdgpu_debugfs_firmware_init(struct amdgpu_device *adev);
-int amdgpu_debugfs_gem_init(struct amdgpu_device *adev);
+void amdgpu_debugfs_fini(struct amdgpu_device *adev);
+void amdgpu_debugfs_fence_init(struct amdgpu_device *adev);
+void amdgpu_debugfs_firmware_init(struct amdgpu_device *adev);
+void amdgpu_debugfs_gem_init(struct amdgpu_device *adev);
+void amdgpu_debugfs_mes_event_log_init(struct amdgpu_device *adev);
+

@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_pll.h,v 1.3 2021/12/18 23:44:58 riastradh Exp $	*/
-
 /*
  * Copyright 2014 Advanced Micro Devices, Inc.
  *
@@ -26,7 +24,8 @@
 #ifndef __AMDGPU_PLL_H__
 #define __AMDGPU_PLL_H__
 
-void amdgpu_pll_compute(struct amdgpu_pll *pll,
+void amdgpu_pll_compute(struct amdgpu_device *adev,
+			 struct amdgpu_pll *pll,
 			 u32 freq,
 			 u32 *dot_clock_p,
 			 u32 *fb_div_p,

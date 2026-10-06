@@ -1,5 +1,3 @@
-/*	$NetBSD: sdma_v3_0.h,v 1.3 2021/12/18 23:44:59 riastradh Exp $	*/
-
 /*
  * Copyright 2014 Advanced Micro Devices, Inc.
  *

@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_df_v1_7.c,v 1.2 2021/12/18 23:44:58 riastradh Exp $	*/
-
 /*
  * Copyright 2018 Advanced Micro Devices, Inc.
  *
@@ -22,9 +20,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  */
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_df_v1_7.c,v 1.2 2021/12/18 23:44:58 riastradh Exp $");
-
 #include "amdgpu.h"
 #include "df_v1_7.h"
 
@@ -46,7 +41,7 @@ static void df_v1_7_sw_fini(struct amdgpu_device *adev)
 }
 
 static void df_v1_7_enable_broadcast_mode(struct amdgpu_device *adev,
-                                          bool enable)
+					  bool enable)
 {
 	u32 tmp;
 
@@ -75,6 +70,8 @@ static u32 df_v1_7_get_hbm_channel_number(struct amdgpu_device *adev)
 	int fb_channel_number;
 
 	fb_channel_number = adev->df.funcs->get_fb_channel_number(adev);
+	if (fb_channel_number >= ARRAY_SIZE(df_v1_7_channel_number))
+		fb_channel_number = 0;
 
 	return df_v1_7_channel_number[fb_channel_number];
 }
@@ -99,12 +96,12 @@ static void df_v1_7_update_medium_grain_clock_gating(struct amdgpu_device *adev,
 		WREG32_SOC15(DF, 0, mmDF_PIE_AON0_DfGlobalClkGater, tmp);
 	}
 
-	/* Exit boradcast mode */
+	/* Exit broadcast mode */
 	adev->df.funcs->enable_broadcast_mode(adev, false);
 }
 
 static void df_v1_7_get_clockgating_state(struct amdgpu_device *adev,
-					  u32 *flags)
+					  u64 *flags)
 {
 	u32 tmp;
 
