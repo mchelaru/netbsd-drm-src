@@ -466,14 +466,16 @@ sysbeep0	at pcppi?
 i915drmkms*	at pci? dev ? function ?
 intelfb*	at intelfbbus?
 
-radeon* 	at pci? dev ? function ?
-radeondrmkmsfb* at radeonfbbus?
+# XXX: disabled until I figure out new ttm
+#radeon* 	at pci? dev ? function ?
+#radeondrmkmsfb* at radeonfbbus?
 
 #amdgpu*	at pci? dev ? function ?
 #amdgpufb*	at amdgpufbbus?
 
-nouveau*	at pci? dev ? function ?
-nouveaufb*	at nouveaufbbus?
+# XXX: disabled until I figure out new ttm
+#nouveau*	at pci? dev ? function ?
+#nouveaufb*	at nouveaufbbus?
 
 # DRMUMS drivers -- make them loadable, but not statically linked in
 options 	DRM_LEGACY
