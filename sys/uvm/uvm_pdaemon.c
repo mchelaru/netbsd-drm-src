@@ -1082,3 +1082,14 @@ uvmpd_pool_drain_wakeup(void)
 	cv_signal(&uvmpd_pool_drain_cv);
 	mutex_exit(&uvmpd_lock);
 }
+
+/*
+ * _uvm_lwp_is_pagedaemon: returns true of the specified lwp is
+ * a pagedaemon lwp.
+ */
+
+bool
+_uvm_lwp_is_pagedaemon(struct lwp *l)
+{
+	return _uvm_lwp_is_pagedaemon_test(l);
+}

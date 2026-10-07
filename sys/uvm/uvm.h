@@ -170,6 +170,15 @@ do {									\
 } while (/*CONSTCOND*/ 0)
 
 void uvm_kick_pdaemon(void);
+bool _uvm_lwp_is_pagedaemon(struct lwp *);
+
+#define	_uvm_lwp_is_pagedaemon_test(l) ((l) == uvm.pagedaemon_lwp)
+
+#ifdef _MODULE
+#define	uvm_lwp_is_pagedaemon(l) _uvm_lwp_is_pagedaemon(l)
+#else
+#define	uvm_lwp_is_pagedaemon(l) _uvm_lwp_is_pagedaemon_test(l)
+#endif
 
 /*
  * UVM_PAGE_OWN: track page ownership (only if UVM_PAGE_TRKOWN)
