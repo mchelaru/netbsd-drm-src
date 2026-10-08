@@ -35,27 +35,8 @@
 #define DEFAULT_AUX_MAX_DATA_SIZE 16
 #define AUX_MAX_DEFER_WRITE_RETRY 20
 
-struct aux_payload {
-	/* set following flag to read/write I2C data,
-	 * reset it to read/write DPCD data */
-	bool i2c_over_aux;
-	/* set following flag to write data,
-	 * reset it to read data */
-	bool write;
-	bool mot;
-	uint32_t address;
-	uint32_t length;
-	uint8_t *data;
-	/*
-	 * used to return the reply type of the transaction
-	 * ignored if NULL
-	 */
-	uint8_t *reply;
-	/* expressed in milliseconds
-	 * zero means "use default value"
-	 */
-	uint32_t defer_delay;
-};
+/* aux_payload defined in dc_ddc_types.h */
+#include "dc_ddc_types.h"
 
 struct aux_command {
 	struct aux_payload *payloads;

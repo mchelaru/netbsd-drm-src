@@ -1,5 +1,3 @@
-/*	$NetBSD: fixed31_32.h,v 1.3 2021/12/19 10:59:02 riastradh Exp $	*/
-
 /*
  * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
@@ -27,8 +25,6 @@
 
 #ifndef __DAL_FIXED31_32_H__
 #define __DAL_FIXED31_32_H__
-
-#include "os_types.h"
 
 #ifndef LLONG_MAX
 #define LLONG_MAX 9223372036854775807ll
@@ -72,12 +68,6 @@ static const struct fixed31_32 dc_fixpt_zero = { 0 };
 static const struct fixed31_32 dc_fixpt_epsilon = { 1LL };
 static const struct fixed31_32 dc_fixpt_half = { 0x80000000LL };
 static const struct fixed31_32 dc_fixpt_one = { 0x100000000LL };
-
-static const struct fixed31_32 dc_fixpt_pi = { 13493037705LL };
-static const struct fixed31_32 dc_fixpt_two_pi = { 26986075409LL };
-static const struct fixed31_32 dc_fixpt_e = { 11674931555LL };
-static const struct fixed31_32 dc_fixpt_ln2 = { 2977044471LL };
-static const struct fixed31_32 dc_fixpt_ln2_div_2 = { 1488522236LL };
 
 /*
  * @brief
@@ -332,7 +322,7 @@ struct fixed31_32 dc_fixpt_sqr(struct fixed31_32 arg);
  */
 static inline struct fixed31_32 dc_fixpt_div_int(struct fixed31_32 arg1, long long arg2)
 {
-	return dc_fixpt_from_fraction(arg1.value, dc_fixpt_from_int(arg2).value);
+	return dc_fixpt_from_fraction(arg1.value, dc_fixpt_from_int((int)arg2).value);
 }
 
 /*
@@ -435,6 +425,9 @@ struct fixed31_32 dc_fixpt_log(struct fixed31_32 arg);
  */
 static inline struct fixed31_32 dc_fixpt_pow(struct fixed31_32 arg1, struct fixed31_32 arg2)
 {
+	if (arg1.value == 0)
+		return arg2.value == 0 ? dc_fixpt_one : dc_fixpt_zero;
+
 	return dc_fixpt_exp(
 		dc_fixpt_mul(
 			dc_fixpt_log(arg1),
@@ -537,5 +530,11 @@ static inline struct fixed31_32 dc_fixpt_truncate(struct fixed31_32 arg, unsigne
 		arg.value = -arg.value;
 	return arg;
 }
+
+struct fixed31_32 dc_fixpt_from_ux_dy(unsigned int value, unsigned int integer_bits, unsigned int fractional_bits);
+struct fixed31_32 dc_fixpt_from_int_dy(unsigned int int_value,
+		unsigned int frac_value,
+		unsigned int integer_bits,
+		unsigned int fractional_bits);
 
 #endif

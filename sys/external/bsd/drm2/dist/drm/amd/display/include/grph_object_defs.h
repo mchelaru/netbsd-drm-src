@@ -1,5 +1,3 @@
-/*	$NetBSD: grph_object_defs.h,v 1.2 2021/12/18 23:45:07 riastradh Exp $	*/
-
 /*
  * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
@@ -140,6 +138,16 @@ enum sync_source {
 
 	/* Misc. flow control sources */
 	SYNC_SOURCE_DUAL_GPU_PIN
+};
+
+enum tx_ffe_id {
+	TX_FFE0 = 0,
+	TX_FFE1,
+	TX_FFE2,
+	TX_FFE3,
+	TX_FFE_DeEmphasis_Only,
+	TX_FFE_PreShoot_Only,
+	TX_FFE_No_FFE,
 };
 
 /* connector sizes in millimeters - from BiosParserTypes.hpp */

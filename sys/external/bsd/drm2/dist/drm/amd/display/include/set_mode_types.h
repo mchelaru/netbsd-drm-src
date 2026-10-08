@@ -1,5 +1,3 @@
-/*	$NetBSD: set_mode_types.h,v 1.2 2021/12/18 23:45:07 riastradh Exp $	*/
-
 /*
  * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
@@ -86,10 +84,14 @@ union hdmi_info_packet {
 		uint16_t bar_left;
 		uint16_t bar_right;
 
-		uint8_t F140_F143:4;
+		uint8_t FR0_FR3:4;
 		uint8_t ACE0_ACE3:4;
 
-		uint8_t reserved[13];
+		uint8_t RID0_RID5:6;
+		uint8_t FR4:1;
+		uint8_t F157:1;
+
+		uint8_t reserved[12];
 	} bits;
 
 	struct info_packet_raw_data packet_raw_data;

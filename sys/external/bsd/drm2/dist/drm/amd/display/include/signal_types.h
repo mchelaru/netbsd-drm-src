@@ -1,5 +1,3 @@
-/*	$NetBSD: signal_types.h,v 1.2 2021/12/18 23:45:07 riastradh Exp $	*/
-
 /*
  * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
@@ -46,6 +44,34 @@ enum signal_type {
 	SIGNAL_TYPE_VIRTUAL		= (1 << 9),	/* Virtual Display */
 };
 
+static inline const char *signal_type_to_string(const int type)
+{
+	switch (type) {
+	case SIGNAL_TYPE_NONE:
+		return "No signal";
+	case SIGNAL_TYPE_DVI_SINGLE_LINK:
+		return "DVI: Single Link";
+	case SIGNAL_TYPE_DVI_DUAL_LINK:
+		return "DVI: Dual Link";
+	case SIGNAL_TYPE_HDMI_TYPE_A:
+		return "HDMI: TYPE A";
+	case SIGNAL_TYPE_LVDS:
+		return "LVDS";
+	case SIGNAL_TYPE_RGB:
+		return "RGB";
+	case SIGNAL_TYPE_DISPLAY_PORT:
+		return "Display Port";
+	case SIGNAL_TYPE_DISPLAY_PORT_MST:
+		return "Display Port: MST";
+	case SIGNAL_TYPE_EDP:
+		return "Embedded Display Port";
+	case SIGNAL_TYPE_VIRTUAL:
+		return "Virtual";
+	default:
+		return "Unknown";
+	}
+}
+
 /* help functions for signal types manipulation */
 static inline bool dc_is_hdmi_tmds_signal(enum signal_type signal)
 {
@@ -85,6 +111,19 @@ static inline bool dc_is_dvi_signal(enum signal_type signal)
 	switch (signal) {
 	case SIGNAL_TYPE_DVI_SINGLE_LINK:
 	case SIGNAL_TYPE_DVI_DUAL_LINK:
+		return true;
+	break;
+	default:
+		return false;
+	}
+}
+
+static inline bool dc_is_tmds_signal(enum signal_type signal)
+{
+	switch (signal) {
+	case SIGNAL_TYPE_DVI_SINGLE_LINK:
+	case SIGNAL_TYPE_DVI_DUAL_LINK:
+	case SIGNAL_TYPE_HDMI_TYPE_A:
 		return true;
 	break;
 	default:
