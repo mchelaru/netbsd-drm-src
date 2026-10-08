@@ -461,8 +461,21 @@ struct drm_sched_job *drm_sched_entity_pop_job(struct drm_sched_entity *entity)
 	if (!sched_job)
 		return NULL;
 
-	while ((entity->dependency =
-			sched->ops->dependency(sched_job, entity))) {
+	/*
+	 * Older drivers implement ops->dependency; newer ones (amdgpu)
+	 * only set ops->prepare_job with the same signature. Prefer
+	 * dependency, fall back to prepare_job, else skip.
+	 */
+	while (sched->ops->dependency || sched->ops->prepare_job) {
+		struct dma_fence *(*get_dep)(struct drm_sched_job *,
+					     struct drm_sched_entity *) =
+			sched->ops->dependency ? sched->ops->dependency :
+						 sched->ops->prepare_job;
+
+		entity->dependency = get_dep(sched_job, entity);
+		if (!entity->dependency)
+			break;
+
 		trace_drm_sched_job_wait_dep(sched_job, entity->dependency);
 
 		if (drm_sched_entity_add_dependency_cb(entity))

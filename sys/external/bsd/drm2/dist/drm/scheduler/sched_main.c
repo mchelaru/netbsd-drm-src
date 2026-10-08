@@ -847,6 +847,9 @@ int drm_sched_init(struct drm_gpu_scheduler *sched,
 	sched->name = name;
 	sched->timeout = timeout;
 	sched->hang_limit = hang_limit;
+#ifdef __NetBSD__
+	sched->num_rqs = DRM_SCHED_PRIORITY_MAX;
+#endif
 	for (i = DRM_SCHED_PRIORITY_MIN; i < DRM_SCHED_PRIORITY_MAX; i++)
 		drm_sched_rq_init(sched, &sched->sched_rq[i]);
 
