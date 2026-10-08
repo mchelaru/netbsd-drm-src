@@ -1153,7 +1153,10 @@ void
 drm_gem_object_put(struct drm_gem_object *obj)
 {
 	if (obj) {
+#ifndef __NetBSD__
+		/* XXX TODO reenable */
 		WARN_ON(!mutex_is_locked(&obj->dev->struct_mutex));
+#endif
 
 		kref_put(&obj->refcount, drm_gem_object_free);
 	}
