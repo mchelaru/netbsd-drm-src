@@ -1,5 +1,6 @@
+/* SPDX-License-Identifier: MIT */
 /*
- * Copyright 2018 Advanced Micro Devices, Inc.
+ * Copyright 2022 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,14 +24,13 @@
  *
  */
 
-#ifndef __AMDGPU_DM_DEBUGFS_H__
-#define __AMDGPU_DM_DEBUGFS_H__
+#ifndef __AMDGPU_DM_WB_H__
+#define __AMDGPU_DM_WB_H__
 
-#include "amdgpu.h"
-#include "amdgpu_dm.h"
+#include <drm/drm_writeback.h>
 
-void connector_debugfs_init(struct amdgpu_dm_connector *connector);
-void dtn_debugfs_init(struct amdgpu_device *adev);
-void crtc_debugfs_init(struct drm_crtc *crtc);
+int amdgpu_dm_wb_connector_init(struct amdgpu_display_manager *dm,
+				struct amdgpu_dm_wb_connector *dm_wbcon,
+				uint32_t link_index);
 
 #endif

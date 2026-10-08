@@ -1,5 +1,6 @@
+/* SPDX-License-Identifier: MIT */
 /*
- * Copyright 2018 Advanced Micro Devices, Inc.
+ * Copyright 2022 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,14 +24,28 @@
  *
  */
 
-#ifndef __AMDGPU_DM_DEBUGFS_H__
-#define __AMDGPU_DM_DEBUGFS_H__
+#ifndef __AMDGPU_DM_CRTC_H__
+#define __AMDGPU_DM_CRTC_H__
 
-#include "amdgpu.h"
-#include "amdgpu_dm.h"
+void amdgpu_dm_crtc_handle_vblank(struct amdgpu_crtc *acrtc);
 
-void connector_debugfs_init(struct amdgpu_dm_connector *connector);
-void dtn_debugfs_init(struct amdgpu_device *adev);
-void crtc_debugfs_init(struct drm_crtc *crtc);
+bool amdgpu_dm_crtc_modeset_required(struct drm_crtc_state *crtc_state,
+		      struct dc_stream_state *new_stream,
+		      struct dc_stream_state *old_stream);
+
+int amdgpu_dm_crtc_set_vupdate_irq(struct drm_crtc *crtc, bool enable);
+
+bool amdgpu_dm_crtc_vrr_active_irq(struct amdgpu_crtc *acrtc);
+
+bool amdgpu_dm_crtc_vrr_active(const struct dm_crtc_state *dm_state);
+
+int amdgpu_dm_crtc_enable_vblank(struct drm_crtc *crtc);
+
+void amdgpu_dm_crtc_disable_vblank(struct drm_crtc *crtc);
+
+int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
+			struct drm_plane *plane,
+			uint32_t link_index);
 
 #endif
+

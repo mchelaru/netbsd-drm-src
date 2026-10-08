@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Advanced Micro Devices, Inc.
+ * Copyright 2020 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,14 +23,27 @@
  *
  */
 
-#ifndef __AMDGPU_DM_DEBUGFS_H__
-#define __AMDGPU_DM_DEBUGFS_H__
+#ifndef __AMDGPU_DM_IRQ_PARAMS_H__
+#define __AMDGPU_DM_IRQ_PARAMS_H__
 
-#include "amdgpu.h"
-#include "amdgpu_dm.h"
+#include "amdgpu_dm_crc.h"
 
-void connector_debugfs_init(struct amdgpu_dm_connector *connector);
-void dtn_debugfs_init(struct amdgpu_device *adev);
-void crtc_debugfs_init(struct drm_crtc *crtc);
+struct dm_irq_params {
+	u32 last_flip_vblank;
+	struct mod_vrr_params vrr_params;
+	struct dc_stream_state *stream;
+	int active_planes;
+	bool allow_sr_entry;
+	struct mod_freesync_config freesync_config;
 
+#ifdef CONFIG_DEBUG_FS
+	enum amdgpu_dm_pipe_crc_source crc_src;
+#ifdef CONFIG_DRM_AMD_SECURE_DISPLAY
+	struct crc_window_param window_param[MAX_CRC_WINDOW_NUM];
+	/* At least one CRC window is activated or not*/
+	bool crc_window_activated;
 #endif
+#endif
+};
+
+#endif /* __AMDGPU_DM_IRQ_PARAMS_H__ */

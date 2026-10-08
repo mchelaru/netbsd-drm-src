@@ -36,6 +36,7 @@ __KERNEL_RCSID(0, "$NetBSD: amdgpu_dm_helpers.c,v 1.3 2021/12/19 12:01:30 riastr
 #include <drm/drm_probe_helper.h>
 #include <drm/amdgpu_drm.h>
 #include <drm/drm_edid.h>
+#include <drm/ttm/ttm_placement.h>
 
 #include "dm_services.h"
 #include "amdgpu.h"
@@ -45,6 +46,7 @@ __KERNEL_RCSID(0, "$NetBSD: amdgpu_dm_helpers.c,v 1.3 2021/12/19 12:01:30 riastr
 #include "amdgpu_dm_mst_types.h"
 
 #include "dm_helpers.h"
+#include "mod_info_packet.h"
 
 /* dm_helpers_parse_edid_caps
  *
@@ -56,7 +58,7 @@ __KERNEL_RCSID(0, "$NetBSD: amdgpu_dm_helpers.c,v 1.3 2021/12/19 12:01:30 riastr
  *	void
  * */
 enum dc_edid_status dm_helpers_parse_edid_caps(
-		struct dc_context *ctx,
+		struct dc_link *link,
 		const struct dc_edid *edid,
 		struct dc_edid_caps *edid_caps)
 {
@@ -136,7 +138,7 @@ enum dc_edid_status dm_helpers_parse_edid_caps(
 
 static void get_payload_table(
 		struct amdgpu_dm_connector *aconnector,
-		struct dp_mst_stream_allocation_table *proposed_table)
+		struct dc_dp_mst_stream_allocation_table *proposed_table)
 {
 	int i;
 	struct drm_dp_mst_topology_mgr *mst_mgr =
@@ -158,7 +160,7 @@ static void get_payload_table(
 			mst_mgr->payloads[i].payload_state ==
 					DP_PAYLOAD_REMOTE) {
 
-			struct dp_mst_stream_allocation *sa =
+			struct dc_dp_mst_stream_allocation *sa =
 					&proposed_table->stream_allocations[
 						proposed_table->stream_count];
 
@@ -182,7 +184,7 @@ void dm_helpers_dp_update_branch_info(
 bool dm_helpers_dp_mst_write_payload_allocation_table(
 		struct dc_context *ctx,
 		const struct dc_stream_state *stream,
-		struct dp_mst_stream_allocation_table *proposed_table,
+		struct dc_dp_mst_stream_allocation_table *proposed_table,
 		bool enable)
 {
 	struct amdgpu_dm_connector *aconnector;
@@ -280,34 +282,31 @@ enum act_return_status dm_helpers_dp_mst_poll_for_allocation_change_trigger(
 	return ACT_SUCCESS;
 }
 
-bool dm_helpers_dp_mst_send_payload_allocation(
+void dm_helpers_dp_mst_send_payload_allocation(
 		struct dc_context *ctx,
-		const struct dc_stream_state *stream,
-		bool enable)
+		const struct dc_stream_state *stream)
 {
 	struct amdgpu_dm_connector *aconnector;
 	struct drm_dp_mst_topology_mgr *mst_mgr;
 	struct drm_dp_mst_port *mst_port;
+	bool enable = true;
 
 	aconnector = (struct amdgpu_dm_connector *)stream->dm_stream_context;
 
 	if (!aconnector || !aconnector->mst_port)
-		return false;
+		return;
 
 	mst_port = aconnector->port;
-
 	mst_mgr = &aconnector->mst_port->mst_mgr;
 
 	if (!mst_mgr->mst_state)
-		return false;
+		return;
 
 	/* It's OK for this to fail */
 	drm_dp_update_payload_part2(mst_mgr);
 
 	if (!enable)
 		drm_dp_mst_deallocate_vcpi(mst_mgr, mst_port);
-
-	return true;
 }
 
 void dm_dtn_log_begin(struct dc_context *ctx,
@@ -421,15 +420,15 @@ bool dm_helpers_dp_mst_start_top_mgr(
 	return (drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr, true) == 0);
 }
 
-void dm_helpers_dp_mst_stop_top_mgr(
+bool dm_helpers_dp_mst_stop_top_mgr(
 		struct dc_context *ctx,
-		const struct dc_link *link)
+		struct dc_link *link)
 {
 	struct amdgpu_dm_connector *aconnector = link->priv;
 
 	if (!aconnector) {
 			DRM_ERROR("Failed to found connector for link!");
-			return;
+			return false;
 	}
 
 	DRM_INFO("DM_MST: stopping TM on aconnector: %p [id: %d]\n",
@@ -437,6 +436,7 @@ void dm_helpers_dp_mst_stop_top_mgr(
 
 	if (aconnector->mst_mgr.mst_state == true)
 		drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr, false);
+	return true;
 }
 
 bool dm_helpers_dp_read_dpcd(
@@ -586,7 +586,7 @@ enum dc_edid_status dm_helpers_read_local_edid(
 		kfree(edid);
 
 		edid_status = dm_helpers_parse_edid_caps(
-						ctx,
+						link,
 						&sink->dc_edid,
 						&sink->edid_caps);
 
@@ -631,4 +631,178 @@ enum dc_edid_status dm_helpers_read_local_edid(
 void dm_set_dcn_clocks(struct dc_context *ctx, struct dc_clocks *clks)
 {
 	/* TODO: something */
+}
+
+void *dm_helpers_allocate_gpu_mem(
+		struct dc_context *ctx,
+		enum dc_gpu_mem_alloc_type type,
+		size_t size,
+		uint64_t *addr)
+{
+	struct amdgpu_device *adev = ctx->driver_context;
+	struct dal_allocation *da;
+	u32 domain = (type == DC_MEM_ALLOC_TYPE_GART) ?
+		AMDGPU_GEM_DOMAIN_GTT : AMDGPU_GEM_DOMAIN_VRAM;
+	int ret;
+
+	da = kzalloc(sizeof(*da), GFP_KERNEL);
+	if (!da)
+		return NULL;
+
+	ret = amdgpu_bo_create_kernel(adev, size, PAGE_SIZE,
+				      domain, &da->bo,
+				      &da->gpu_addr, &da->cpu_ptr);
+	if (ret) {
+		kfree(da);
+		return NULL;
+	}
+
+	*addr = da->gpu_addr;
+	if (da->cpu_ptr && size)
+		memset(da->cpu_ptr, 0, size);
+#ifdef __NetBSD__
+	/*
+	 * On Phoenix APUs we force CPU-mapped kernel BOs into GTT (broken
+	 * aper_base_kaddr).  SMU TransferTableDram2Smu / Smu2Dram expect a
+	 * framebuffer/MC address, not a GART offset -- handing them GTT can
+	 * hard-hang the fabric (blank screen + dead network) during
+	 * dc_hardware_init -> notify_wm_ranges.
+	 *
+	 * Hide the address so clk_mgr skips SMU table DMA; defaults remain.
+	 * Callers must not parse the (unfilled) DPM table when addr == 0.
+	 */
+	if ((adev->flags & AMD_IS_APU) &&
+	    type == DC_MEM_ALLOC_TYPE_FRAME_BUFFER &&
+	    da->bo && da->bo->tbo.resource &&
+	    da->bo->tbo.resource->mem_type == TTM_PL_TT) {
+		DRM_INFO("amdgpu: SMU FB alloc in GTT (gpu_addr=0x%llx); "
+			 "clearing mc_address to avoid SMU DMA hang\n",
+			 (unsigned long long)da->gpu_addr);
+		*addr = 0;
+	}
+#endif
+	list_add(&da->list, &adev->dm.da_list);
+	return da->cpu_ptr;
+}
+
+void dm_helpers_free_gpu_mem(
+		struct dc_context *ctx,
+		enum dc_gpu_mem_alloc_type type,
+		void *pvMem)
+{
+	struct amdgpu_device *adev = ctx->driver_context;
+	struct dal_allocation *da, *tmp;
+
+	list_for_each_entry_safe(da, tmp, &adev->dm.da_list, list) {
+		if (pvMem == da->cpu_ptr) {
+			amdgpu_bo_free_kernel(&da->bo, &da->gpu_addr, &da->cpu_ptr);
+			list_del(&da->list);
+			kfree(da);
+			break;
+		}
+	}
+}
+
+void dm_helpers_dp_mst_update_mst_mgr_for_deallocation(
+		struct dc_context *ctx,
+		const struct dc_stream_state *stream)
+{
+}
+
+void dm_helpers_dp_mst_update_branch_bandwidth(
+		struct dc_context *ctx,
+		struct dc_link *link)
+{
+}
+
+bool dm_helpers_dp_write_hblank_reduction(
+		struct dc_context *ctx,
+		const struct dc_stream_state *stream)
+{
+	return false;
+}
+
+void dm_helpers_mst_enable_stream_features(const struct dc_stream_state *stream)
+{
+}
+
+bool dm_helpers_dp_handle_test_pattern_request(
+		struct dc_context *ctx,
+		const struct dc_link *link,
+		union link_test_pattern dpcd_test_pattern,
+		union test_misc dpcd_test_params)
+{
+	return false;
+}
+
+void dm_helpers_enable_periodic_detection(struct dc_context *ctx, bool enable)
+{
+}
+
+void dm_set_phyd32clk(struct dc_context *ctx, int freq_khz)
+{
+}
+
+bool dm_helpers_dmub_outbox_interrupt_control(struct dc_context *ctx, bool enable)
+{
+	return false;
+}
+
+void dm_helpers_smu_timeout(struct dc_context *ctx, unsigned int msg_id,
+		unsigned int param, unsigned int timeout_us)
+{
+}
+
+void dm_helpers_init_panel_settings(
+	struct dc_context *ctx,
+	struct dc_panel_config *config,
+	struct dc_sink *sink)
+{
+}
+
+void dm_helpers_override_panel_settings(
+	struct dc_context *ctx,
+	struct dc_panel_config *config)
+{
+}
+
+int dm_helper_dmub_aux_transfer_sync(
+		struct dc_context *ctx,
+		const struct dc_link *link,
+		struct aux_payload *payload,
+		enum aux_return_code_type *operation_result)
+{
+	if (operation_result)
+		*operation_result = AUX_RET_ERROR_UNKNOWN;
+	return -1;
+}
+
+int dm_helpers_dmub_set_config_sync(struct dc_context *ctx,
+		const struct dc_link *link,
+		struct set_config_cmd_payload *payload,
+		enum set_config_status *operation_result)
+{
+	if (operation_result)
+		*operation_result = SET_CONFIG_UNKNOWN_ERROR;
+	return -1;
+}
+
+enum adaptive_sync_type dm_get_adaptive_sync_support_type(struct dc_link *link)
+{
+	return ADAPTIVE_SYNC_TYPE_NONE;
+}
+
+enum dc_edid_status dm_helpers_get_sbios_edid(struct dc_link *link, struct dc_edid *edid)
+{
+	return EDID_NO_RESPONSE;
+}
+
+bool dm_helpers_is_fullscreen(struct dc_context *ctx, struct dc_stream_state *stream)
+{
+	return false;
+}
+
+bool dm_helpers_is_hdr_on(struct dc_context *ctx, struct dc_stream_state *stream)
+{
+	return false;
 }

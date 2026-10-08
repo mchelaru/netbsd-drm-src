@@ -351,19 +351,19 @@ int amdgpu_dm_update_crtc_color_mgmt(struct dm_crtc_state *crtc)
 		 * inverse color ramp in legacy userspace.
 		 */
 		crtc->cm_is_degamma_srgb = true;
-		stream->out_transfer_func->type = TF_TYPE_DISTRIBUTED_POINTS;
-		stream->out_transfer_func->tf = TRANSFER_FUNCTION_SRGB;
+		stream->out_transfer_func.type = TF_TYPE_DISTRIBUTED_POINTS;
+		stream->out_transfer_func.tf = TRANSFER_FUNCTION_SRGB;
 
-		r = __set_legacy_tf(stream->out_transfer_func, regamma_lut,
+		r = __set_legacy_tf(&stream->out_transfer_func, regamma_lut,
 				    regamma_size, has_rom);
 		if (r)
 			return r;
 	} else if (has_regamma) {
 		/* CRTC RGM goes into RGM LUT. */
-		stream->out_transfer_func->type = TF_TYPE_DISTRIBUTED_POINTS;
-		stream->out_transfer_func->tf = TRANSFER_FUNCTION_LINEAR;
+		stream->out_transfer_func.type = TF_TYPE_DISTRIBUTED_POINTS;
+		stream->out_transfer_func.tf = TRANSFER_FUNCTION_LINEAR;
 
-		r = __set_output_tf(stream->out_transfer_func, regamma_lut,
+		r = __set_output_tf(&stream->out_transfer_func, regamma_lut,
 				    regamma_size, has_rom);
 		if (r)
 			return r;
@@ -372,8 +372,8 @@ int amdgpu_dm_update_crtc_color_mgmt(struct dm_crtc_state *crtc)
 		 * No CRTC RGM means we can just put the block into bypass
 		 * since we don't have any plane level adjustments using it.
 		 */
-		stream->out_transfer_func->type = TF_TYPE_BYPASS;
-		stream->out_transfer_func->tf = TRANSFER_FUNCTION_LINEAR;
+		stream->out_transfer_func.type = TF_TYPE_BYPASS;
+		stream->out_transfer_func.tf = TRANSFER_FUNCTION_LINEAR;
 	}
 
 	/*
@@ -432,7 +432,7 @@ int amdgpu_dm_update_plane_color_mgmt(struct dm_crtc_state *crtc,
 						 &degamma_size);
 		ASSERT(degamma_size == MAX_COLOR_LUT_ENTRIES);
 
-		dc_plane_state->in_transfer_func->type =
+		dc_plane_state->in_transfer_func.type =
 			TF_TYPE_DISTRIBUTED_POINTS;
 
 		/*
@@ -460,13 +460,13 @@ int amdgpu_dm_update_plane_color_mgmt(struct dm_crtc_state *crtc,
 		 * map these to the atomic one instead.
 		 */
 		if (crtc->cm_is_degamma_srgb)
-			dc_plane_state->in_transfer_func->tf =
+			dc_plane_state->in_transfer_func.tf =
 				TRANSFER_FUNCTION_SRGB;
 		else
-			dc_plane_state->in_transfer_func->tf =
+			dc_plane_state->in_transfer_func.tf =
 				TRANSFER_FUNCTION_LINEAR;
 
-		r = __set_input_tf(dc_plane_state->in_transfer_func,
+		r = __set_input_tf(&dc_plane_state->in_transfer_func,
 				   degamma_lut, degamma_size);
 		if (r)
 			return r;
@@ -475,12 +475,12 @@ int amdgpu_dm_update_plane_color_mgmt(struct dm_crtc_state *crtc,
 		 * For legacy gamma support we need the regamma input
 		 * in linear space. Assume that the input is sRGB.
 		 */
-		dc_plane_state->in_transfer_func->type = TF_TYPE_PREDEFINED;
-		dc_plane_state->in_transfer_func->tf = TRANSFER_FUNCTION_SRGB;
+		dc_plane_state->in_transfer_func.type = TF_TYPE_PREDEFINED;
+		dc_plane_state->in_transfer_func.tf = TRANSFER_FUNCTION_SRGB;
 	} else {
 		/* ...Otherwise we can just bypass the DGM block. */
-		dc_plane_state->in_transfer_func->type = TF_TYPE_BYPASS;
-		dc_plane_state->in_transfer_func->tf = TRANSFER_FUNCTION_LINEAR;
+		dc_plane_state->in_transfer_func.type = TF_TYPE_BYPASS;
+		dc_plane_state->in_transfer_func.tf = TRANSFER_FUNCTION_LINEAR;
 	}
 
 	return 0;

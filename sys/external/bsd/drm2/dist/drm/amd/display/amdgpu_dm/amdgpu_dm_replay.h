@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Advanced Micro Devices, Inc.
+ * Copyright 2021 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,14 +23,26 @@
  *
  */
 
-#ifndef __AMDGPU_DM_DEBUGFS_H__
-#define __AMDGPU_DM_DEBUGFS_H__
+#ifndef AMDGPU_DM_AMDGPU_DM_REPLAY_H_
+#define AMDGPU_DM_AMDGPU_DM_REPLAY_H_
 
 #include "amdgpu.h"
-#include "amdgpu_dm.h"
 
-void connector_debugfs_init(struct amdgpu_dm_connector *connector);
-void dtn_debugfs_init(struct amdgpu_device *adev);
-void crtc_debugfs_init(struct drm_crtc *crtc);
+enum replay_enable_option {
+	pr_enable_option_static_screen = 0x1,
+	pr_enable_option_mpo_video = 0x2,
+	pr_enable_option_full_screen_video = 0x4,
+	pr_enable_option_general_ui = 0x8,
+	pr_enable_option_static_screen_coasting = 0x10000,
+	pr_enable_option_mpo_video_coasting = 0x20000,
+	pr_enable_option_full_screen_video_coasting = 0x40000,
+};
 
-#endif
+bool amdgpu_dm_link_supports_replay(struct dc_link *link, struct amdgpu_dm_connector *aconnector);
+bool amdgpu_dm_replay_enable(struct dc_stream_state *stream, bool enable);
+bool amdgpu_dm_set_replay_caps(struct dc_link *link, struct amdgpu_dm_connector *aconnector);
+bool amdgpu_dm_link_setup_replay(struct dc_link *link, struct amdgpu_dm_connector *aconnector);
+bool amdgpu_dm_replay_disable(struct dc_stream_state *stream);
+bool amdgpu_dm_replay_disable_all(struct amdgpu_display_manager *dm);
+
+#endif /* AMDGPU_DM_AMDGPU_DM_REPLAY_H_ */

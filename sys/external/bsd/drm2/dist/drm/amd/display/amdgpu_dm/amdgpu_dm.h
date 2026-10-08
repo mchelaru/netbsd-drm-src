@@ -104,6 +104,16 @@ struct amdgpu_dm_backlight_caps {
 };
 
 /**
+ * struct dal_allocation - Tracks mapped FB/GART memory for SMU communication
+ */
+struct dal_allocation {
+	struct list_head list;
+	struct amdgpu_bo *bo;
+	void *cpu_ptr;
+	u64 gpu_addr;
+};
+
+/**
  * struct amdgpu_display_manager - Central amdgpu display manager device
  *
  * @dc: Display Core control structure
@@ -303,6 +313,13 @@ struct amdgpu_display_manager {
 	 * available in FW
 	 */
 	const struct gpu_info_soc_bounding_box_v1_0 *soc_bounding_box;
+
+	/**
+	 * @da_list:
+	 *
+	 * DAL fb/gart memory allocation list, for communication with SMU.
+	 */
+	struct list_head da_list;
 };
 
 struct amdgpu_dm_connector {
