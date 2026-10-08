@@ -1,5 +1,3 @@
-/*	$NetBSD: mod_shared.h,v 1.2 2021/12/18 23:45:07 riastradh Exp $	*/
-
 /*
  * Copyright 2016 Advanced Micro Devices, Inc.
  *
@@ -42,8 +40,9 @@ enum color_transfer_func {
 
 enum vrr_packet_type {
 	PACKET_TYPE_VRR,
-	PACKET_TYPE_FS1,
-	PACKET_TYPE_FS2,
+	PACKET_TYPE_FS_V1,
+	PACKET_TYPE_FS_V2,
+	PACKET_TYPE_FS_V3,
 	PACKET_TYPE_VTEM
 };
 

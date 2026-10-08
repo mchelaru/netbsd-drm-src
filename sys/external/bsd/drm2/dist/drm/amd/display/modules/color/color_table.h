@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Advanced Micro Devices, Inc.
+ * Copyright 2016 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,24 +23,25 @@
  *
  */
 
-#ifndef MOD_VMID_H_
-#define MOD_VMID_H_
 
-#define MAX_VMID 16
+#ifndef COLOR_MOD_COLOR_TABLE_H_
+#define COLOR_MOD_COLOR_TABLE_H_
 
-#include "dc.h"
+#include "dc_types.h"
 
-struct mod_vmid {
-	int dummy;
+#define NUM_PTS_IN_REGION 16
+#define NUM_REGIONS 32
+#define MAX_HW_POINTS (NUM_PTS_IN_REGION*NUM_REGIONS)
+
+enum table_type {
+	type_pq_table,
+	type_de_pq_table
 };
 
-uint8_t mod_vmid_get_for_ptb(struct mod_vmid *mod_vmid, uint64_t ptb);
-void mod_vmid_reset(struct mod_vmid *mod_vmid);
-struct mod_vmid *mod_vmid_create(
-		struct dc *dc,
-		unsigned int num_vmid,
-		struct dc_virtual_addr_space_config *va_config);
+bool mod_color_is_table_init(enum table_type type);
 
-void mod_vmid_destroy(struct mod_vmid *mod_vmid);
+struct fixed31_32 *mod_color_get_table(enum table_type type);
 
-#endif /* MOD_VMID_H_ */
+void mod_color_set_table_init_state(enum table_type type, bool state);
+
+#endif /* COLOR_MOD_COLOR_TABLE_H_ */

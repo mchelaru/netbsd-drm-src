@@ -23,24 +23,42 @@
  *
  */
 
-#ifndef MOD_VMID_H_
-#define MOD_VMID_H_
+#include "color_table.h"
 
-#define MAX_VMID 16
+static struct fixed31_32 pq_table[MAX_HW_POINTS + 2];
+static struct fixed31_32 de_pq_table[MAX_HW_POINTS + 2];
+static bool pq_initialized;
+static bool de_pg_initialized;
 
-#include "dc.h"
+bool mod_color_is_table_init(enum table_type type)
+{
+	bool ret = false;
 
-struct mod_vmid {
-	int dummy;
-};
+	if (type == type_pq_table)
+		ret = pq_initialized;
+	if (type == type_de_pq_table)
+		ret = de_pg_initialized;
 
-uint8_t mod_vmid_get_for_ptb(struct mod_vmid *mod_vmid, uint64_t ptb);
-void mod_vmid_reset(struct mod_vmid *mod_vmid);
-struct mod_vmid *mod_vmid_create(
-		struct dc *dc,
-		unsigned int num_vmid,
-		struct dc_virtual_addr_space_config *va_config);
+	return ret;
+}
 
-void mod_vmid_destroy(struct mod_vmid *mod_vmid);
+struct fixed31_32 *mod_color_get_table(enum table_type type)
+{
+	struct fixed31_32 *table = NULL;
 
-#endif /* MOD_VMID_H_ */
+	if (type == type_pq_table)
+		table = pq_table;
+	if (type == type_de_pq_table)
+		table = de_pq_table;
+
+	return table;
+}
+
+void mod_color_set_table_init_state(enum table_type type, bool state)
+{
+	if (type == type_pq_table)
+		pq_initialized = state;
+	if (type == type_de_pq_table)
+		de_pg_initialized = state;
+}
+
