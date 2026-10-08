@@ -1,5 +1,3 @@
-/*	$NetBSD: display_mode_vba_20.h,v 1.2 2021/12/18 23:45:04 riastradh Exp $	*/
-
 /*
  * Copyright 2018 Advanced Micro Devices, Inc.
  *
