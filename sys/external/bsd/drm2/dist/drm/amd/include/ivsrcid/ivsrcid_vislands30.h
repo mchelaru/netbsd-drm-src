@@ -1,5 +1,3 @@
-/*	$NetBSD: ivsrcid_vislands30.h,v 1.2 2021/12/18 23:45:24 riastradh Exp $	*/
-
 /*
  * Volcanic Islands IV SRC Register documentation
  *

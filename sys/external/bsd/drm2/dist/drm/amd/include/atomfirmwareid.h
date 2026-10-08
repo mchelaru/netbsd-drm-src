@@ -1,5 +1,3 @@
-/*	$NetBSD: atomfirmwareid.h,v 1.2 2021/12/18 23:45:08 riastradh Exp $	*/
-
 /****************************************************************************\
 * 
 *  File Name      atomfirmwareid.h

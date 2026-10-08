@@ -1,5 +1,3 @@
-/*	$NetBSD: irqsrcs_gfx_10_1.h,v 1.2 2021/12/18 23:45:25 riastradh Exp $	*/
-
 /*
  * Copyright 2018 Advanced Micro Devices, Inc.
  *

@@ -1,5 +1,3 @@
-/*	$NetBSD: navi14_ip_offset.h,v 1.2 2021/12/18 23:45:08 riastradh Exp $	*/
-
 /*
  * Copyright (C) 2018  Advanced Micro Devices, Inc.
  *
@@ -27,15 +25,13 @@
 #define MAX_SEGMENT                                        5
 
 
-struct IP_BASE_INSTANCE
-{
+struct IP_BASE_INSTANCE {
     unsigned int segment[MAX_SEGMENT];
 };
 
-struct IP_BASE
-{
+struct IP_BASE {
     struct IP_BASE_INSTANCE instance[MAX_INSTANCE];
-};
+} __maybe_unused;
 
 
 static const struct IP_BASE ATHUB_BASE ={ { { { 0x00000C00, 0x02408C00, 0, 0, 0 } },

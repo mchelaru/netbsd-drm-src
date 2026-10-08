@@ -1,5 +1,3 @@
-/*	$NetBSD: navi10_enum.h,v 1.3 2021/12/19 10:59:02 riastradh Exp $	*/
-
 /*
  * Copyright (C) 2019  Advanced Micro Devices, Inc.
  *
@@ -432,7 +430,7 @@ ARRAY_2D_DEPTH                           = 0x00000001,
  */
 
 typedef enum ENUM_NUM_SIMD_PER_CU {
-NUM_SIMD_PER_CU                          = 0x00000004,
+NUM_SIMD_PER_CU                          = 0x00000002,
 } ENUM_NUM_SIMD_PER_CU;
 
 /*
@@ -19623,7 +19621,7 @@ typedef enum CovToShaderSel {
 INPUT_COVERAGE                           = 0x00000000,
 INPUT_INNER_COVERAGE                     = 0x00000001,
 INPUT_DEPTH_COVERAGE                     = 0x00000002,
-#ifndef __NetBSD__		/* XXX &@!#!^ */
+#ifndef __NetBSD__		/* XXX RAW vs sys/param.h */
 RAW                                      = 0x00000003,
 #endif
 } CovToShaderSel;

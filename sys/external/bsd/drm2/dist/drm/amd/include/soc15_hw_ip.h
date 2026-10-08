@@ -1,5 +1,3 @@
-/*	$NetBSD: soc15_hw_ip.h,v 1.2 2021/12/18 23:45:08 riastradh Exp $	*/
-
 /*
  * Copyright (C) 2018  Advanced Micro Devices, Inc.
  *
@@ -45,6 +43,7 @@
 #define DAZ_HWID                                         274
 #define SDPMUX_HWID                                       19
 #define NTB_HWID                                          20
+#define VPE_HWID                                          21
 #define IOHC_HWID                                         24
 #define L2IMU_HWID                                        28
 #define VCE_HWID                                          32
@@ -82,10 +81,13 @@
 #define L1IMU15_HWID                                      65
 #define WAFLC_HWID                                        66
 #define FCH_USB_PD_HWID                                   67
+#define SDMA2_HWID                                        68
+#define SDMA3_HWID                                        69
 #define PCIE_HWID                                         70
 #define PCS_HWID                                          80
 #define DDCL_HWID                                         89
 #define SST_HWID                                          90
+#define LSDMA_HWID                                        91
 #define IOAGR_HWID                                       100
 #define NBIF_HWID                                        108
 #define IOAPIC_HWID                                      124

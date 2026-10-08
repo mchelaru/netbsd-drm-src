@@ -1,5 +1,3 @@
-/*	$NetBSD: displayobject.h,v 1.2 2021/12/18 23:45:08 riastradh Exp $	*/
-
 /****************************************************************************\
 * 
 *  Module Name    displayobjectsoc15.h

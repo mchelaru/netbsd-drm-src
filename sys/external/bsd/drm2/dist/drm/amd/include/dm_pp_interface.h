@@ -1,5 +1,3 @@
-/*	$NetBSD: dm_pp_interface.h,v 1.2 2021/12/18 23:45:08 riastradh Exp $	*/
-
 /*
  * Copyright 2016 Advanced Micro Devices, Inc.
  *
@@ -29,7 +27,7 @@
 
 #define PP_MAX_CLOCK_LEVELS 16
 
-enum amd_pp_display_config_type{
+enum amd_pp_display_config_type {
 	AMD_PP_DisplayConfigType_None = 0,
 	AMD_PP_DisplayConfigType_DP54 ,
 	AMD_PP_DisplayConfigType_DP432 ,
@@ -38,8 +36,8 @@ enum amd_pp_display_config_type{
 	AMD_PP_DisplayConfigType_DP243,
 	AMD_PP_DisplayConfigType_DP216,
 	AMD_PP_DisplayConfigType_DP162,
-	AMD_PP_DisplayConfigType_HDMI6G ,
-	AMD_PP_DisplayConfigType_HDMI297 ,
+	AMD_PP_DisplayConfigType_HDMI6G,
+	AMD_PP_DisplayConfigType_HDMI297,
 	AMD_PP_DisplayConfigType_HDMI162,
 	AMD_PP_DisplayConfigType_LVDS,
 	AMD_PP_DisplayConfigType_DVI,
@@ -47,8 +45,7 @@ enum amd_pp_display_config_type{
 	AMD_PP_DisplayConfigType_VGA
 };
 
-struct single_display_configuration
-{
+struct single_display_configuration {
 	uint32_t controller_index;
 	uint32_t controller_id;
 	uint32_t signal_type;

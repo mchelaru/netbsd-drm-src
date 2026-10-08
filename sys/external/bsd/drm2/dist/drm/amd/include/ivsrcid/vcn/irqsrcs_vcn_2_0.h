@@ -1,5 +1,3 @@
-/*	$NetBSD: irqsrcs_vcn_2_0.h,v 1.2 2021/12/18 23:45:26 riastradh Exp $	*/
-
 /*
  * Copyright 2018 Advanced Micro Devices, Inc.
  *
@@ -30,5 +28,9 @@
 #define VCN_2_0__SRCID__UVD_SYSTEM_MESSAGE_INTERRUPT			124		// 0x7c UVD system message interrupt
 #define VCN_2_0__SRCID__JPEG_ENCODE					151		// 0x97 JRBC Encode interrupt
 #define VCN_2_0__SRCID__JPEG_DECODE					153		// 0x99 JRBC Decode interrupt
+
+#define VCN_2_6__SRCID_UVD_POISON					160
+#define VCN_2_6__SRCID_DJPEG0_POISON					161
+#define VCN_2_6__SRCID_EJPEG0_POISON					162
 
 #endif
