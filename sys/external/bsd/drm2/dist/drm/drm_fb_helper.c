@@ -87,6 +87,8 @@ MODULE_PARM_DESC(drm_leak_fbdev_smem,
 #endif
 
 #ifdef __NetBSD__		/* XXX LIST_HEAD means something else */
+#include <machine/bootinfo.h>
+
 static struct list_head kernel_fb_helper_list =
     LIST_HEAD_INIT(kernel_fb_helper_list);
 #define	kernel_fb_helper_lock	drm_kernel_fb_helper_lock
@@ -1816,6 +1818,24 @@ __drm_fb_helper_initial_config_and_unlock(struct drm_fb_helper *fb_helper,
 
 	width = dev->mode_config.max_width;
 	height = dev->mode_config.max_height;
+
+#ifdef __NetBSD__
+	/* match the bootloader gop */
+	{
+		const struct btinfo_framebuffer *bi =
+		    lookup_bootinfo(BTINFO_FRAMEBUFFER);
+
+		if (bi != NULL && bi->physaddr != 0 &&
+		    bi->width > 0 && bi->height > 0) {
+			if (width > bi->width)
+				width = bi->width;
+			if (height > bi->height)
+				height = bi->height;
+			DRM_INFO("drmfb: cap fbdev to boot FB %ux%u (gop)\n",
+			    bi->width, bi->height);
+		}
+	}
+#endif
 
 	drm_client_modeset_probe(&fb_helper->client, width, height);
 	ret = drm_fb_helper_single_fb_probe(fb_helper, bpp_sel);
