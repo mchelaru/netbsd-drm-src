@@ -45,10 +45,7 @@ struct drm_fb_helper;
 #include <sys/device_if.h>
 #endif
 
-enum mode_set_atomic {
-	LEAVE_ATOMIC_MODE_SET,
-	ENTER_ATOMIC_MODE_SET,
-};
+/* enum mode_set_atomic is defined in drm_modeset_helper_vtables.h */
 
 /**
  * struct drm_fb_helper_surface_size - describes fbdev size and scanout surface size

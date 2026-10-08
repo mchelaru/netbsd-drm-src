@@ -557,4 +557,18 @@ void __drm_err(const char *format, ...);
 #define DRM_DEBUG_PRIME_RATELIMITED(fmt, ...)				\
 	DRM_DEV_DEBUG_PRIME_RATELIMITED(NULL, fmt, ##__VA_ARGS__)
 
+#ifdef __NetBSD__		/* XXX amdgpu */
+/* Simplified: no Linux WARN_ONCE/dev_name plumbing. */
+#define drm_WARN(drm, condition, format, arg...)			\
+	do {								\
+		if (condition)						\
+			DRM_WARN(format, ##arg);			\
+	} while (0)
+#define drm_WARN_ONCE(drm, condition, format, arg...)			\
+	do {								\
+		if (condition)						\
+			DRM_WARN_ONCE(format, ##arg);			\
+	} while (0)
+#endif
+
 #endif /* DRM_PRINT_H_ */

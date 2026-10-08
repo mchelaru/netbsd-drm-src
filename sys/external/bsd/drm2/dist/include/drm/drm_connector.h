@@ -452,6 +452,9 @@ struct drm_display_info {
 	 * more stuff redundant with @bus_formats.
 	 */
 	u8 edid_hdmi_dc_modes;
+	/* Newer field names used by amdgpu connectors code. */
+	u8 edid_hdmi_rgb444_dc_modes;
+	u8 edid_hdmi_ycrcb444_dc_modes;
 
 	/**
 	 * @cea_rev: CEA revision of the HDMI sink.
@@ -462,6 +465,11 @@ struct drm_display_info {
 	 * @hdmi: advance features of a HDMI sink.
 	 */
 	struct drm_hdmi_info hdmi;
+
+	/**
+	 * @is_hdmi: Sink identified as HDMI (legacy AMDGPU field).
+	 */
+	bool is_hdmi;
 
 	/**
 	 * @non_desktop: Non desktop display (HMD).
@@ -1561,6 +1569,12 @@ int drm_connector_init_panel_orientation_property(
 	struct drm_connector *connector, int width, int height);
 int drm_connector_attach_max_bpc_property(struct drm_connector *connector,
 					  int min, int max);
+
+static inline void
+drm_connector_attach_dp_subconnector_property(struct drm_connector *connector)
+{
+	(void)connector;
+}
 
 /**
  * struct drm_tile_group - Tile group metadata

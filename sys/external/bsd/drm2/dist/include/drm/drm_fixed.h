@@ -28,6 +28,7 @@
 #define DRM_FIXED_H
 
 #include <linux/math64.h>
+#include <linux/kernel.h>
 
 typedef union dfixed {
 	u32 full;

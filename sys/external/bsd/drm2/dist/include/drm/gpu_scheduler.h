@@ -29,10 +29,18 @@
 #include <drm/spsc_queue.h>
 #include <drm/drm_wait_netbsd.h>
 #include <linux/dma-fence.h>
+#include <linux/dma-resv.h>
 #include <linux/completion.h>
 #include <linux/workqueue.h>
 
 #define MAX_WAIT_SCHED_ENTITY_Q_EMPTY msecs_to_jiffies(1000)
+
+/*
+ * Prevent dependency pipelining through the scheduler (Linux 5.x+).
+ * Uses a dma_fence user bit; NetBSD provides DMA_FENCE_FLAG_USER_BITS.
+ */
+#define DRM_SCHED_FENCE_DONT_PIPELINE		DMA_FENCE_FLAG_USER_BITS
+#define DRM_SCHED_FENCE_FLAG_HAS_DEADLINE_BIT	(DMA_FENCE_FLAG_USER_BITS + 1)
 
 struct drm_gpu_scheduler;
 struct drm_sched_rq;
@@ -198,7 +206,11 @@ struct drm_sched_job {
 	struct drm_gpu_scheduler	*sched;
 	struct drm_sched_fence		*s_fence;
 	struct dma_fence_cb		finish_cb;
-	struct list_head		node;
+	/* Linux uses `list`; keep `node` as a synonym via union for NetBSD sched. */
+	union {
+		struct list_head	node;
+		struct list_head	list;
+	};
 	uint64_t			id;
 	atomic_t			karma;
 	enum drm_sched_priority		s_priority;
@@ -213,6 +225,18 @@ static inline bool drm_sched_invalidate_job(struct drm_sched_job *s_job,
 }
 
 /**
+ * enum drm_gpu_sched_stat - the scheduler's status for a given job
+ *
+ * These values used by &struct drm_sched_backend_ops.timedout_job, then
+ * inspected by the scheduler to decide whether to clean up the job, etc.
+ */
+enum drm_gpu_sched_stat {
+	DRM_GPU_SCHED_STAT_NONE, /* Reserve 0 */
+	DRM_GPU_SCHED_STAT_NOMINAL,
+	DRM_GPU_SCHED_STAT_ENODEV,
+};
+
+/**
  * struct drm_sched_backend_ops
  *
  * Define the backend operations called by the scheduler,
@@ -223,9 +247,17 @@ struct drm_sched_backend_ops {
          * @dependency: Called when the scheduler is considering scheduling
          * this job next, to get another struct dma_fence for this job to
 	 * block on.  Once it returns NULL, run_job() may be called.
+	 * Older NetBSD scheduler still uses this; newer Linux prefers prepare_job.
 	 */
 	struct dma_fence *(*dependency)(struct drm_sched_job *sched_job,
 					struct drm_sched_entity *s_entity);
+
+	/**
+	 * @prepare_job: Called before hardware push (newer Linux API).
+	 * Unused by the NetBSD 5.x scheduler core; amdgpu may still set it.
+	 */
+	struct dma_fence *(*prepare_job)(struct drm_sched_job *sched_job,
+					 struct drm_sched_entity *s_entity);
 
 	/**
          * @run_job: Called to execute the job once all of the dependencies
@@ -238,8 +270,10 @@ struct drm_sched_backend_ops {
 	/**
          * @timedout_job: Called when a job has taken too long to execute,
          * to trigger GPU recovery.
+	 * Newer drivers return enum drm_gpu_sched_stat; NetBSD sched core
+	 * ignores the return value.
 	 */
-	void (*timedout_job)(struct drm_sched_job *sched_job);
+	enum drm_gpu_sched_stat (*timedout_job)(struct drm_sched_job *sched_job);
 
 	/**
          * @free_job: Called once the job's finished fence has been signaled
@@ -282,6 +316,8 @@ struct drm_gpu_scheduler {
 	long				timeout;
 	const char			*name;
 	struct drm_sched_rq		sched_rq[DRM_SCHED_PRIORITY_MAX];
+	/* Linux API compatibility: always DRM_SCHED_PRIORITY_MAX on NetBSD. */
+	uint32_t			num_rqs;
 	drm_waitqueue_t			wake_up_worker;
 	drm_waitqueue_t			job_scheduled;
 	atomic_t			hw_rq_count;
@@ -345,5 +381,122 @@ void drm_sched_fence_finished(struct drm_sched_fence *fence);
 unsigned long drm_sched_suspend_timeout(struct drm_gpu_scheduler *sched);
 void drm_sched_resume_timeout(struct drm_gpu_scheduler *sched,
 		                unsigned long remaining);
+
+#ifdef __NetBSD__
+/*
+ * Compatibility shims for newer Linux drm_sched APIs used by current amdgpu.
+ * NetBSD still has the older 5.x scheduler (job armed in drm_sched_job_init,
+ * push_job takes entity, no HIGH / pick_best / modify_sched / job deps).
+ */
+#define DRM_SCHED_PRIORITY_HIGH	DRM_SCHED_PRIORITY_HIGH_SW
+
+/* Linux renamed ring_mirror_list -> pending_list and job->node -> job->list. */
+#define pending_list	ring_mirror_list
+
+/*
+ * Careful: cannot #define list->node globally (too broad).
+ * amdgpu_job uses job->list; provide a member alias via macro only in
+ * contexts that include this after the struct — use container field rename
+ * in the struct itself below... see list/node dual name in struct.
+ */
+
+/*
+ * Newer Linux drm_sched_job_init() takes a credits argument. Use this
+ * wrapper from amdgpu instead of a 4-arg macro that would break the
+ * real 3-arg function definition in sched_main.c.
+ */
+static inline int
+drm_sched_job_init_credits(struct drm_sched_job *job,
+			   struct drm_sched_entity *entity,
+			   u32 credits, void *owner)
+{
+	(void)credits;
+	return drm_sched_job_init(job, entity, owner);
+}
+
+static inline void
+drm_sched_wqueue_stop(struct drm_gpu_scheduler *sched)
+{
+	drm_sched_stop(sched, NULL);
+}
+
+static inline void
+drm_sched_wqueue_start(struct drm_gpu_scheduler *sched)
+{
+	drm_sched_start(sched, false);
+}
+
+static inline bool
+drm_sched_wqueue_ready(struct drm_gpu_scheduler *sched)
+{
+	return sched && sched->ready;
+}
+
+static inline void
+drm_sched_job_arm(struct drm_sched_job *job)
+{
+	/* drm_sched_job_init() already selects rq and creates s_fence. */
+	(void)job;
+}
+
+static inline int
+drm_sched_job_add_dependency(struct drm_sched_job *job,
+			     struct dma_fence *fence)
+{
+	(void)job;
+	/* Consume fence like Linux; job-level deps not tracked here. */
+	dma_fence_put(fence);
+	return 0;
+}
+
+static inline int
+drm_sched_job_add_resv_dependencies(struct drm_sched_job *job,
+				    struct dma_resv *resv,
+				    enum dma_resv_usage usage)
+{
+	/* NetBSD: full resv-walk deps not wired; callers still build. */
+	(void)job;
+	(void)resv;
+	(void)usage;
+	return 0;
+}
+
+static inline int
+drm_sched_entity_error(struct drm_sched_entity *entity)
+{
+	struct dma_fence *fence = READ_ONCE(entity->last_scheduled);
+
+	return fence ? fence->error : 0;
+}
+
+static inline void
+drm_sched_entity_modify_sched(struct drm_sched_entity *entity,
+			      struct drm_gpu_scheduler **sched_list,
+			      unsigned int num_sched_list)
+{
+	entity->sched_list = sched_list;
+	entity->num_sched_list = num_sched_list;
+}
+
+static inline struct drm_gpu_scheduler *
+drm_sched_pick_best(struct drm_gpu_scheduler **sched_list,
+		    unsigned int num_sched_list)
+{
+	struct drm_gpu_scheduler *sched, *picked = NULL;
+	unsigned int i, min_score = ~0U, num_score;
+
+	for (i = 0; i < num_sched_list; ++i) {
+		sched = sched_list[i];
+		if (!sched || !sched->ready)
+			continue;
+		num_score = atomic_read(&sched->score);
+		if (num_score < min_score) {
+			min_score = num_score;
+			picked = sched;
+		}
+	}
+	return picked;
+}
+#endif /* __NetBSD__ */
 
 #endif

@@ -453,6 +453,15 @@ int drm_gem_dumb_destroy(struct drm_file *file,
 			 struct drm_device *dev,
 			 uint32_t handle);
 
+/**
+ * drm_gem_object_is_shared_for_memory_stats - helper for shared memory stats
+ */
+static inline bool
+drm_gem_object_is_shared_for_memory_stats(struct drm_gem_object *obj)
+{
+	return (obj->handle_count > 1) || obj->dma_buf != NULL;
+}
+
 #define	free(addr, type)		kern_free(addr)
 
 #endif /* __DRM_GEM_H__ */

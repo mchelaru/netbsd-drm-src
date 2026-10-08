@@ -416,4 +416,25 @@ void drm_send_event(struct drm_device *dev, struct drm_pending_event *e);
 
 struct file *mock_drm_getfile(struct drm_minor *minor, unsigned int flags);
 
+/**
+ * struct drm_memory_stats - GEM object stats associated with a file
+ */
+struct drm_memory_stats {
+	u64 shared;
+	u64 private;
+	u64 resident;
+	u64 purgeable;
+	u64 active;
+};
+
+static inline int
+drm_memory_stats_is_zero(const struct drm_memory_stats *stats)
+{
+	return (stats->shared == 0 &&
+		stats->private == 0 &&
+		stats->resident == 0 &&
+		stats->purgeable == 0 &&
+		stats->active == 0);
+}
+
 #endif /* _DRM_FILE_H_ */

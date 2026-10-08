@@ -506,4 +506,42 @@ void drm_edid_get_monitor_name(struct edid *edid, char *name,
 struct drm_display_mode *drm_mode_find_dmt(struct drm_device *dev,
 					   int hsize, int vsize, int fresh,
 					   bool rb);
+
+/*
+ * Newer Linux DRM "struct drm_edid" wrapper API.  NetBSD keeps the classic
+ * struct edid * paths; provide a thin opaque wrapper so amdgpu sources that
+ * already migrated compile.  The wrapper pointer is the classic edid blob.
+ */
+struct drm_edid;
+
+static inline const struct drm_edid *
+drm_edid_alloc(const void *edid, size_t size)
+{
+	if (edid == NULL || size < EDID_LENGTH)
+		return NULL;
+	return (const struct drm_edid *)edid;
+}
+
+static inline void
+drm_edid_free(const struct drm_edid *drm_edid)
+{
+	/*
+	 * Fake-EDID patch records point into VBIOS ROM; do not free.
+	 * Real allocations (if any) use the classic drm_edid_duplicate path.
+	 */
+	(void)drm_edid;
+}
+
+static inline bool
+drm_edid_valid(const struct drm_edid *drm_edid)
+{
+	return drm_edid_is_valid((struct edid *)(uintptr_t)drm_edid);
+}
+
+static inline const struct edid *
+drm_edid_raw(const struct drm_edid *drm_edid)
+{
+	return (const struct edid *)(uintptr_t)drm_edid;
+}
+
 #endif /* __DRM_EDID_H__ */
