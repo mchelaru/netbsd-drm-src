@@ -1,5 +1,3 @@
-/*	$NetBSD: sdma3_4_2_2_sh_mask.h,v 1.2 2021/12/18 23:45:22 riastradh Exp $	*/
-
 /*
  * Copyright (C) 2018  Advanced Micro Devices, Inc.
  *

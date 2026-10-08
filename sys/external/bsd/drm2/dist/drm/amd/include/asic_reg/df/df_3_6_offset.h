@@ -1,5 +1,3 @@
-/*	$NetBSD: df_3_6_offset.h,v 1.2 2021/12/18 23:45:13 riastradh Exp $	*/
-
 /*
  * Copyright (C) 2018  Advanced Micro Devices, Inc.
  *
@@ -34,6 +32,9 @@
 
 #define mmDF_CS_UMC_AON0_DramBaseAddress0								0x0044
 #define mmDF_CS_UMC_AON0_DramBaseAddress0_BASE_IDX							0
+
+#define mmDF_GCM_AON0_DramMegaBaseAddress0								0x0064
+#define mmDF_GCM_AON0_DramMegaBaseAddress0_BASE_IDX							0
 
 #define smnPerfMonCtlLo0					0x01d440UL
 #define smnPerfMonCtlHi0					0x01d444UL
@@ -75,5 +76,10 @@
 
 #define smnDF_CS_UMC_AON0_DramBaseAddress0 	0x1c110UL
 #define smnDF_CS_UMC_AON0_DramLimitAddress0 	0x1c114UL
+
+#define mmDF_CS_UMC_AON0_HardwareAssertMaskLow                                                         0x067e
+#define mmDF_CS_UMC_AON0_HardwareAssertMaskLow_BASE_IDX                                                0
+#define mmDF_NCS_PG0_HardwareAssertMaskHigh                                                            0x067f
+#define mmDF_NCS_PG0_HardwareAssertMaskHigh_BASE_IDX                                                   0
 
 #endif

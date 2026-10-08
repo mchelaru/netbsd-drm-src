@@ -1,5 +1,3 @@
-/*	$NetBSD: oss_3_0_1_enum.h,v 1.3 2021/12/18 23:45:22 riastradh Exp $	*/
-
 /*
  * OSS_3_0_1 Register documentation
  *

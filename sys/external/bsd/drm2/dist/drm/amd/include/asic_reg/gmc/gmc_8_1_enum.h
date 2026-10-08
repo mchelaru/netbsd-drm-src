@@ -1,5 +1,3 @@
-/*	$NetBSD: gmc_8_1_enum.h,v 1.3 2021/12/18 23:45:15 riastradh Exp $	*/
-
 /*
  * GMC_8_1 Register documentation
  *

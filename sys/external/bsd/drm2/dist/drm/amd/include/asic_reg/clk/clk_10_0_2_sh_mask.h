@@ -1,5 +1,3 @@
-/*	$NetBSD: clk_10_0_2_sh_mask.h,v 1.2 2021/12/18 23:45:09 riastradh Exp $	*/
-
 /*
  * Copyright (C) 2019  Advanced Micro Devices, Inc.
  *

@@ -1,5 +1,3 @@
-/*	$NetBSD: uvd_5_0_d.h,v 1.3 2021/12/18 23:45:24 riastradh Exp $	*/
-
 /*
  * UVD_5_0 Register documentation
  *

@@ -1,5 +1,3 @@
-/*	$NetBSD: bif_4_1_sh_mask.h,v 1.3 2021/12/18 23:45:09 riastradh Exp $	*/
-
 /*
  * BIF_4_1 Register documentation
  *

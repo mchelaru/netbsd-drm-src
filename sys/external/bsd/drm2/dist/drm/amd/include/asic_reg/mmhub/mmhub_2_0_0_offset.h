@@ -1,5 +1,3 @@
-/*	$NetBSD: mmhub_2_0_0_offset.h,v 1.2 2021/12/18 23:45:16 riastradh Exp $	*/
-
 /*
  * Copyright (C) 2019  Advanced Micro Devices, Inc.
  *

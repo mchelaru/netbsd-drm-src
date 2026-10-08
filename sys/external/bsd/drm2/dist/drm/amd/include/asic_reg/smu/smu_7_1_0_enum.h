@@ -1,5 +1,3 @@
-/*	$NetBSD: smu_7_1_0_enum.h,v 1.3 2021/12/18 23:45:23 riastradh Exp $	*/
-
 /*
  * SMU_7_1_0 Register documentation
  *

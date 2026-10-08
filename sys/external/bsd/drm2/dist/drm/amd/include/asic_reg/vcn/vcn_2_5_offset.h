@@ -1,5 +1,3 @@
-/*	$NetBSD: vcn_2_5_offset.h,v 1.2 2021/12/18 23:45:24 riastradh Exp $	*/
-
 /*
  * Copyright (C) 2019  Advanced Micro Devices, Inc.
  *
@@ -989,5 +987,19 @@
 #define mmMDM_WIG_PIPE_BUSY                                                                            0x06f9
 #define mmMDM_WIG_PIPE_BUSY_BASE_IDX                                                                   1
 
+
+/* VCN 2_6_0 regs */
+#define mmUVD_RAS_VCPU_VCODEC_STATUS                           0x0057
+#define mmUVD_RAS_VCPU_VCODEC_STATUS_BASE_IDX                  1
+#define mmUVD_RAS_MMSCH_FATAL_ERROR                            0x0058
+#define mmUVD_RAS_MMSCH_FATAL_ERROR_BASE_IDX                   1
+#define mmVCN_RAS_CNTL                                                                                 0x04b9
+#define mmVCN_RAS_CNTL_BASE_IDX                                                                        1
+
+/* JPEG 2_6_0 regs */
+#define mmUVD_RAS_JPEG0_STATUS                                 0x0059
+#define mmUVD_RAS_JPEG0_STATUS_BASE_IDX                        1
+#define mmUVD_RAS_JPEG1_STATUS                                 0x005a
+#define mmUVD_RAS_JPEG1_STATUS_BASE_IDX                        1
 
 #endif

@@ -1,5 +1,3 @@
-/*	$NetBSD: vce_1_0_d.h,v 1.2 2021/12/18 23:45:24 riastradh Exp $	*/
-
 /*
  *
  * Copyright (C) 2016 Advanced Micro Devices, Inc.

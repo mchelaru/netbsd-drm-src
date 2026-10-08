@@ -1,5 +1,3 @@
-/*	$NetBSD: mp_11_0_offset.h,v 1.2 2021/12/18 23:45:17 riastradh Exp $	*/
-
 /*
  * Copyright (C) 2018  Advanced Micro Devices, Inc.
  *
@@ -356,5 +354,12 @@
 #define mmMP1_SMN_EXT_SCRATCH7                                                                         0x03c7
 #define mmMP1_SMN_EXT_SCRATCH7_BASE_IDX                                                                0
 
+/*
+ * addressBlock: mp_SmuMp1Pub_MmuDec
+ * base address: 0x0
+ */
+#define smnMP1_PMI_3_START                                                                              0x3030204
+#define smnMP1_PMI_3_FIFO                                                                               0x3030208
+#define smnMP1_PMI_3                                                                                    0x3030600
 
 #endif

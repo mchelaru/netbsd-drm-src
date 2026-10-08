@@ -1,5 +1,3 @@
-/*	$NetBSD: gc_9_4_1_offset.h,v 1.2 2021/12/18 23:45:14 riastradh Exp $	*/
-
 /*
  * Copyright (C) 2020  Advanced Micro Devices, Inc.
  *
@@ -207,6 +205,8 @@
 #define mmGCEA_EDC_CNT2_BASE_IDX                                                                       0
 #define mmGCEA_EDC_CNT3                                                                                0x071b
 #define mmGCEA_EDC_CNT3_BASE_IDX                                                                       0
+#define mmGCEA_ERR_STATUS                                                                              0x0712
+#define mmGCEA_ERR_STATUS_BASE_IDX                                                                     0
 
 // addressBlock: gc_gfxudec
 // base address: 0x30000

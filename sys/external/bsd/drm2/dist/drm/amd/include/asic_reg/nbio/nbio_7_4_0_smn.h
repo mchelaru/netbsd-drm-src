@@ -1,5 +1,3 @@
-/*	$NetBSD: nbio_7_4_0_smn.h,v 1.2 2021/12/18 23:45:20 riastradh Exp $	*/
-
 /*
  * Copyright (C) 2019  Advanced Micro Devices, Inc.
  *

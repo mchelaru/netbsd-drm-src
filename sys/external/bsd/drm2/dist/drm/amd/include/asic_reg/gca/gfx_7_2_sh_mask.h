@@ -1,5 +1,3 @@
-/*	$NetBSD: gfx_7_2_sh_mask.h,v 1.3 2021/12/18 23:45:15 riastradh Exp $	*/
-
 /*
  * GFX_7_2 Register documentation
  *

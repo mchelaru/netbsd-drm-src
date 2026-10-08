@@ -1,5 +1,3 @@
-/*	$NetBSD: nbio_7_4_offset.h,v 1.2 2021/12/18 23:45:20 riastradh Exp $	*/
-
 /*
  * Copyright (C) 2018  Advanced Micro Devices, Inc.
  *
@@ -2689,8 +2687,10 @@
 #define mmRCC_CONFIG_MEMSIZE_BASE_IDX                                                                  2
 #define mmRCC_CONFIG_RESERVED                                                                          0x00c4
 #define mmRCC_CONFIG_RESERVED_BASE_IDX                                                                 2
+#ifndef mmRCC_IOV_FUNC_IDENTIFIER
 #define mmRCC_IOV_FUNC_IDENTIFIER                                                                      0x00c5
 #define mmRCC_IOV_FUNC_IDENTIFIER_BASE_IDX                                                             2
+#endif
 
 
 // addressBlock: nbio_nbif0_rcc_dev0_BIFDEC1

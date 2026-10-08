@@ -1,5 +1,3 @@
-/*	$NetBSD: dce_8_0_d.h,v 1.3 2021/12/18 23:45:11 riastradh Exp $	*/
-
 /*
  * DCE_8_0 Register documentation
  *

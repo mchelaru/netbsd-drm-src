@@ -1,5 +1,3 @@
-/*	$NetBSD: oss_2_0_sh_mask.h,v 1.3 2021/12/18 23:45:21 riastradh Exp $	*/
-
 /*
  * OSS_2_0 Register documentation
  *

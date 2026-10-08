@@ -1,5 +1,3 @@
-/*	$NetBSD: uvd_6_0_enum.h,v 1.3 2021/12/18 23:45:24 riastradh Exp $	*/
-
 /*
  * UVD_6_0 Register documentation
  *

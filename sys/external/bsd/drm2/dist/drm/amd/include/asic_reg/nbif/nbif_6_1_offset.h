@@ -1,5 +1,3 @@
-/*	$NetBSD: nbif_6_1_offset.h,v 1.2 2021/12/18 23:45:17 riastradh Exp $	*/
-
 /*
  * Copyright (C) 2017  Advanced Micro Devices, Inc.
  *
@@ -1164,8 +1162,10 @@
 #define mmRCC_CONFIG_MEMSIZE_BASE_IDX                                                                  0
 #define mmRCC_CONFIG_RESERVED                                                                          0x0de4 // duplicate 
 #define mmRCC_CONFIG_RESERVED_BASE_IDX                                                                 0
+#ifndef mmRCC_IOV_FUNC_IDENTIFIER
 #define mmRCC_IOV_FUNC_IDENTIFIER                                                                      0x0de5 // duplicate 
 #define mmRCC_IOV_FUNC_IDENTIFIER_BASE_IDX                                                             0
+#endif
 
 
 // addressBlock: syshub_mmreg_ind_syshubdec
