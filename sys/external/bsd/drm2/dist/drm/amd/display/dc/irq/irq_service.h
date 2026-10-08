@@ -1,5 +1,3 @@
-/*	$NetBSD: irq_service.h,v 1.2 2021/12/18 23:45:06 riastradh Exp $	*/
-
 /*
  * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
@@ -55,7 +53,7 @@ struct irq_source_info {
 	uint32_t ack_mask;
 	uint32_t ack_value;
 	uint32_t status_reg;
-	const struct irq_source_info_funcs *funcs;
+	struct irq_source_info_funcs *funcs;
 };
 
 struct irq_service_funcs {

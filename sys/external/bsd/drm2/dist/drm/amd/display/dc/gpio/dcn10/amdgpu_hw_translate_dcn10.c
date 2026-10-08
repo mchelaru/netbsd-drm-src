@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_hw_translate_dcn10.c,v 1.2 2021/12/18 23:45:05 riastradh Exp $	*/
-
 /*
  * Copyright 2013-15 Advanced Micro Devices, Inc.
  *
@@ -28,9 +26,6 @@
 /*
  * Pre-requisites: headers required by header of this unit
  */
-
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_hw_translate_dcn10.c,v 1.2 2021/12/18 23:45:05 riastradh Exp $");
 
 #include "hw_translate_dcn10.h"
 

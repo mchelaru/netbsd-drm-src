@@ -1,5 +1,3 @@
-/*	$NetBSD: conversion.h,v 1.2 2021/12/18 23:45:00 riastradh Exp $	*/
-
 /*
  * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
@@ -39,6 +37,13 @@ void convert_float_matrix(
 	uint16_t *matrix,
 	struct fixed31_32 *flt,
 	uint32_t buffer_size);
+
+void reduce_fraction(uint32_t num, uint32_t den,
+		uint32_t *out_num, uint32_t *out_den);
+
+void convert_hw_matrix(struct fixed31_32 *matrix,
+		       uint16_t *reg,
+		       uint32_t buffer_size);
 
 static inline unsigned int log_2(unsigned int num)
 {

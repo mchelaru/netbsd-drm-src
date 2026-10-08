@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_bios_parser_common.c,v 1.2 2021/12/18 23:45:00 riastradh Exp $	*/
-
 /*
  * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
@@ -24,9 +22,6 @@
  * Authors: AMD
  *
  */
-
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_bios_parser_common.c,v 1.2 2021/12/18 23:45:00 riastradh Exp $");
 
 #include "bios_parser_common.h"
 #include "include/grph_object_ctrl_defs.h"
@@ -217,6 +212,9 @@ static enum connector_id connector_id_from_bios_object_id(
 		break;
 	case CONNECTOR_OBJECT_ID_MXM:
 		id = CONNECTOR_ID_MXM;
+		break;
+	case CONNECTOR_OBJECT_ID_USBC:
+		id = CONNECTOR_ID_USBC;
 		break;
 	default:
 		id = CONNECTOR_ID_UNKNOWN;

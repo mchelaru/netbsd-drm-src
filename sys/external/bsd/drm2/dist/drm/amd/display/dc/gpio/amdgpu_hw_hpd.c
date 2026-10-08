@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_hw_hpd.c,v 1.3 2021/12/19 12:02:39 riastradh Exp $	*/
-
 /*
  * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
@@ -24,11 +22,6 @@
  * Authors: AMD
  *
  */
-
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_hw_hpd.c,v 1.3 2021/12/19 12:02:39 riastradh Exp $");
-
-#include <linux/slab.h>
 
 #include "dm_services.h"
 
@@ -73,8 +66,7 @@ static enum gpio_result get_value(
 	const struct hw_gpio_pin *ptr,
 	uint32_t *value)
 {
-	const struct hw_gpio *gpio = const_container_of(ptr, struct hw_gpio, base);
-	const struct hw_hpd *hpd = const_container_of(gpio, struct hw_hpd, base);
+	struct hw_hpd *hpd = HW_HPD_FROM_BASE(ptr);
 	uint32_t hpd_delayed = 0;
 
 	/* in Interrupt mode we ask for SENSE bit */
@@ -135,7 +127,7 @@ void dal_hw_hpd_init(
 	enum gpio_id id,
 	uint32_t en)
 {
-	if ((en < GPIO_DDC_LINE_MIN) || (en > GPIO_DDC_LINE_MAX)) {
+	if (en > GPIO_DDC_LINE_MAX) {
 		ASSERT_CRITICAL(false);
 		*hw_hpd = NULL;
 	}

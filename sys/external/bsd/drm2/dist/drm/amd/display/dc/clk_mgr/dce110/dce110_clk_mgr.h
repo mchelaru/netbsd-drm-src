@@ -1,5 +1,3 @@
-/*	$NetBSD: dce110_clk_mgr.h,v 1.2 2021/12/18 23:45:01 riastradh Exp $	*/
-
 /*
  * Copyright 2012-16 Advanced Micro Devices, Inc.
  *

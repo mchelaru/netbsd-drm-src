@@ -1,5 +1,3 @@
-/*	$NetBSD: irq_service_dce120.h,v 1.2 2021/12/18 23:45:06 riastradh Exp $	*/
-
 /*
  * Copyright 2012-15 Advanced Micro Devices, Inc.
  *

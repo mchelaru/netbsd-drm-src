@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_hw_factory_dce80.c,v 1.2 2021/12/18 23:45:05 riastradh Exp $	*/
-
 /*
  * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
@@ -24,9 +22,6 @@
  * Authors: AMD
  *
  */
-
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_hw_factory_dce80.c,v 1.2 2021/12/18 23:45:05 riastradh Exp $");
 
 #include "dm_services.h"
 #include "include/gpio_types.h"

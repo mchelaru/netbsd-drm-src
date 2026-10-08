@@ -1,5 +1,3 @@
-/*	$NetBSD: bios_parser_types_internal2.h,v 1.2 2021/12/18 23:45:00 riastradh Exp $	*/
-
 /*
  * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
@@ -42,6 +40,7 @@ struct object_info_table {
 	struct atom_data_revision revision;
 	union {
 		struct display_object_info_table_v1_4 *v1_4;
+		struct display_object_info_table_v1_5 *v1_5;
 	};
 };
 

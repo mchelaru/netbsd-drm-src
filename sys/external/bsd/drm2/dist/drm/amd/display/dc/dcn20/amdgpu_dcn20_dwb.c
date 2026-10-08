@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_dcn20_dwb.c,v 1.2 2021/12/18 23:45:03 riastradh Exp $	*/
-
 /*
  * Copyright 2012-17 Advanced Micro Devices, Inc.
  *
@@ -25,9 +23,6 @@
  *
  */
 
-
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_dcn20_dwb.c,v 1.2 2021/12/18 23:45:03 riastradh Exp $");
 
 #include "reg_helper.h"
 #include "resource.h"
@@ -106,8 +101,8 @@ static bool dwb2_enable(struct dwbc *dwbc, struct dc_dwb_params *params)
 	struct dcn20_dwbc *dwbc20 = TO_DCN20_DWBC(dwbc);
 
 	/* Only chroma scaling (sub-sampling) is supported in DCN2 */
-if ((params->cnv_params.src_width  != params->dest_width) ||
-		(params->cnv_params.src_height != params->dest_height)) {
+	if ((params->cnv_params.src_width  != params->dest_width) ||
+	    (params->cnv_params.src_height != params->dest_height)) {
 
 		DC_LOG_DWB("%s inst = %d, FAILED!LUMA SCALING NOT SUPPORTED", __func__, dwbc20->base.inst);
 		return false;
@@ -304,9 +299,20 @@ void dwb2_set_scaler(struct dwbc *dwbc, struct dc_dwb_params *params)
 		}
 	}
 
+
+	if (dwbc20->dwbc_mask->WBSCL_COEF_RAM_SEL) {
+		/* Swap double buffered coefficient set */
+		uint32_t wbscl_mode = REG_READ(WBSCL_MODE);
+		bool coef_ram_current = get_reg_field_value_ex(
+			wbscl_mode, dwbc20->dwbc_mask->WBSCL_COEF_RAM_SEL_CURRENT,
+			dwbc20->dwbc_shift->WBSCL_COEF_RAM_SEL_CURRENT);
+
+		REG_UPDATE(WBSCL_MODE, WBSCL_COEF_RAM_SEL, !coef_ram_current);
+	}
+
 }
 
-const struct dwbc_funcs dcn20_dwbc_funcs = {
+static const struct dwbc_funcs dcn20_dwbc_funcs = {
 	.get_caps		= dwb2_get_caps,
 	.enable			= dwb2_enable,
 	.disable		= dwb2_disable,

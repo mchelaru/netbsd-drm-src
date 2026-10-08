@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_dce110_opp_csc_v.c,v 1.2 2021/12/18 23:45:02 riastradh Exp $	*/
-
 /*
  * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
@@ -24,9 +22,6 @@
  * Authors: AMD
  *
  */
-
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_dce110_opp_csc_v.c,v 1.2 2021/12/18 23:45:02 riastradh Exp $");
 
 #include "dm_services.h"
 #include "dce110_transform_v.h"
@@ -684,8 +679,7 @@ void dce110_opp_v_set_csc_default(
 	if (default_adjust->force_hw_default == false) {
 		const struct out_csc_color_matrix *elm;
 		/* currently parameter not in use */
-		enum grph_color_adjust_option option =
-			GRPH_COLOR_MATRIX_HW_DEFAULT;
+		enum grph_color_adjust_option option;
 		uint32_t i;
 		/*
 		 * HW default false we program locally defined matrix

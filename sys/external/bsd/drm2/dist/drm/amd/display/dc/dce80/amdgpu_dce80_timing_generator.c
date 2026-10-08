@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_dce80_timing_generator.c,v 1.2 2021/12/18 23:45:03 riastradh Exp $	*/
-
 /*
  * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
@@ -24,9 +22,6 @@
  * Authors: AMD
  *
  */
-
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_dce80_timing_generator.c,v 1.2 2021/12/18 23:45:03 riastradh Exp $");
 
 #include "dm_services.h"
 
@@ -116,13 +111,14 @@ static void program_timing(struct timing_generator *tg,
 	int vstartup_start,
 	int vupdate_offset,
 	int vupdate_width,
+	int pstate_keepout,
 	const enum signal_type signal,
 	bool use_vbios)
 {
 	if (!use_vbios)
 		program_pix_dur(tg, timing->pix_clk_100hz);
 
-	dce110_tg_program_timing(tg, timing, 0, 0, 0, 0, 0, use_vbios);
+	dce110_tg_program_timing(tg, timing, 0, 0, 0, 0, 0, 0, use_vbios);
 }
 
 static void dce80_timing_generator_enable_advanced_request(
@@ -214,6 +210,7 @@ static const struct timing_generator_funcs dce80_tg_funcs = {
 		.tear_down_global_swap_lock =
 				dce110_timing_generator_tear_down_global_swap_lock,
 		.set_drr = dce110_timing_generator_set_drr,
+		.get_last_used_drr_vtotal = NULL,
 		.set_static_screen_control =
 			dce110_timing_generator_set_static_screen_control,
 		.set_test_pattern = dce110_timing_generator_set_test_pattern,
@@ -224,6 +221,7 @@ static const struct timing_generator_funcs dce80_tg_funcs = {
 				dce80_timing_generator_enable_advanced_request,
 		.configure_crc = dce110_configure_crc,
 		.get_crc = dce110_get_crc,
+		.is_two_pixels_per_container = dce110_is_two_pixels_per_container,
 };
 
 void dce80_timing_generator_construct(

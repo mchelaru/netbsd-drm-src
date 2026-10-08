@@ -1,5 +1,3 @@
-/*	$NetBSD: hw_translate_dce110.h,v 1.2 2021/12/18 23:45:04 riastradh Exp $	*/
-
 /*
  * Copyright 2013-15 Advanced Micro Devices, Inc.
  *

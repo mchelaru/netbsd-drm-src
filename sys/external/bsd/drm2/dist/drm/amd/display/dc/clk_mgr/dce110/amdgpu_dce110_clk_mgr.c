@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_dce110_clk_mgr.c,v 1.2 2021/12/18 23:45:01 riastradh Exp $	*/
-
 /*
  * Copyright 2012-16 Advanced Micro Devices, Inc.
  *
@@ -24,9 +22,6 @@
  * Authors: AMD
  *
  */
-
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_dce110_clk_mgr.c,v 1.2 2021/12/18 23:45:01 riastradh Exp $");
 
 #include "core_types.h"
 #include "clk_mgr_internal.h"
@@ -200,7 +195,8 @@ void dce11_pplib_apply_display_requirements(
 	 * , then change minimum memory clock based on real-time bandwidth
 	 * limitation.
 	 */
-	if (ASICREV_IS_VEGA20_P(dc->ctx->asic_id.hw_internal_rev) && (context->stream_count >= 2)) {
+	if (dc->bw_vbios && (dc->ctx->asic_id.chip_family == FAMILY_AI) &&
+	     ASICREV_IS_VEGA20_P(dc->ctx->asic_id.hw_internal_rev) && (context->stream_count >= 2)) {
 		pp_display_cfg->min_memory_clock_khz = max(pp_display_cfg->min_memory_clock_khz,
 							   (uint32_t) div64_s64(
 								   div64_s64(dc->bw_vbios->high_yclk.value,

@@ -1,5 +1,3 @@
-/*	$NetBSD: command_table_helper.h,v 1.2 2021/12/18 23:45:00 riastradh Exp $	*/
-
 /*
  * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
@@ -28,6 +26,9 @@
 #ifndef __DAL_COMMAND_TABLE_HELPER_H__
 #define __DAL_COMMAND_TABLE_HELPER_H__
 
+#if defined(CONFIG_DRM_AMD_DC_SI)
+#include "dce60/command_table_helper_dce60.h"
+#endif
 #include "dce80/command_table_helper_dce80.h"
 #include "dce110/command_table_helper_dce110.h"
 #include "dce112/command_table_helper_dce112.h"

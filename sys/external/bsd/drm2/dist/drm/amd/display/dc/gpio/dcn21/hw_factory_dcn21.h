@@ -1,5 +1,3 @@
-/*	$NetBSD: hw_factory_dcn21.h,v 1.2 2021/12/18 23:45:05 riastradh Exp $	*/
-
 /*
  * Copyright 2018 Advanced Micro Devices, Inc.
  *

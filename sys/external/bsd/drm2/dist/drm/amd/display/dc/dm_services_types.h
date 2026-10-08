@@ -1,5 +1,3 @@
-/*	$NetBSD: dm_services_types.h,v 1.2 2021/12/18 23:45:00 riastradh Exp $	*/
-
 /*
  * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
@@ -269,6 +267,12 @@ struct dtn_min_clk_info {
 	uint32_t disp_clk_khz;
 	uint32_t min_engine_clock_khz;
 	uint32_t min_memory_clock_khz;
+};
+
+enum dm_dmub_wait_type {
+	DM_DMUB_WAIT_TYPE_NO_WAIT,
+	DM_DMUB_WAIT_TYPE_WAIT,
+	DM_DMUB_WAIT_TYPE_WAIT_WITH_REPLY,
 };
 
 #endif

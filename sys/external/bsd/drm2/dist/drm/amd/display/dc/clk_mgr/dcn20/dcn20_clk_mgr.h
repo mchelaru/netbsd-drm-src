@@ -1,5 +1,3 @@
-/*	$NetBSD: dcn20_clk_mgr.h,v 1.2 2021/12/18 23:45:02 riastradh Exp $	*/
-
 /*
  * Copyright 2018 Advanced Micro Devices, Inc.
  *
@@ -52,7 +50,8 @@ void dcn2_get_clock(struct clk_mgr *clk_mgr,
 			enum dc_clock_type clock_type,
 			struct dc_clock_config *clock_cfg);
 
-void dcn20_update_clocks_update_dentist(struct clk_mgr_internal *clk_mgr);
+void dcn20_update_clocks_update_dentist(struct clk_mgr_internal *clk_mgr,
+					struct dc_state *context);
 
 void dcn2_read_clocks_from_hw_dentist(struct clk_mgr *clk_mgr_base);
 

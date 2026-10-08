@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_hw_gpio.c,v 1.3 2021/12/19 12:02:39 riastradh Exp $	*/
-
 /*
  * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
@@ -24,9 +22,6 @@
  * Authors: AMD
  *
  */
-
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_hw_gpio.c,v 1.3 2021/12/19 12:02:39 riastradh Exp $");
 
 #include "dm_services.h"
 #include "include/gpio_types.h"
@@ -79,7 +74,7 @@ enum gpio_result dal_hw_gpio_get_value(
 	const struct hw_gpio_pin *ptr,
 	uint32_t *value)
 {
-	const struct hw_gpio *gpio = const_container_of(ptr, struct hw_gpio, base);
+	const struct hw_gpio *gpio = FROM_HW_GPIO_PIN(ptr);
 
 	enum gpio_result result = GPIO_RESULT_OK;
 
@@ -101,7 +96,7 @@ enum gpio_result dal_hw_gpio_set_value(
 	const struct hw_gpio_pin *ptr,
 	uint32_t value)
 {
-	const struct hw_gpio *gpio = const_container_of(ptr, struct hw_gpio, base);
+	struct hw_gpio *gpio = FROM_HW_GPIO_PIN(ptr);
 
 	/* This is the public interface
 	 * where the input comes from client, not shifted yet

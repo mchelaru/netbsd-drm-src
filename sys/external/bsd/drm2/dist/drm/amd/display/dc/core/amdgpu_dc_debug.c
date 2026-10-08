@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_dc_debug.c,v 1.3 2021/12/19 10:59:01 riastradh Exp $	*/
-
 /*
  * Copyright 2017 Advanced Micro Devices, Inc.
  *
@@ -29,9 +27,6 @@
  *      Author: yonsun
  */
 
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_dc_debug.c,v 1.3 2021/12/19 10:59:01 riastradh Exp $");
-
 #include "dm_services.h"
 
 #include "dc.h"
@@ -41,17 +36,14 @@ __KERNEL_RCSID(0, "$NetBSD: amdgpu_dc_debug.c,v 1.3 2021/12/19 10:59:01 riastrad
 
 #include "resource.h"
 
+#define DC_LOGGER \
+	dc->ctx->logger
 #define DC_LOGGER_INIT(logger)
 
 
 #define SURFACE_TRACE(...) do {\
 		if (dc->debug.surface_trace) \
 			DC_LOG_IF_TRACE(__VA_ARGS__); \
-} while (0)
-
-#define TIMING_TRACE(...) do {\
-	if (dc->debug.timing_trace) \
-		DC_LOG_SYNC(__VA_ARGS__); \
 } while (0)
 
 #define CLOCK_TRACE(...) do {\
@@ -76,8 +68,8 @@ void pre_surface_trace(
 				"plane_state->visible = %d;\n"
 				"plane_state->flip_immediate = %d;\n"
 				"plane_state->address.type = %d;\n"
-				"plane_state->address.grph.addr.quad_part = 0x%"PRIX64";\n"
-				"plane_state->address.grph.meta_addr.quad_part = 0x%"PRIX64";\n"
+				"plane_state->address.grph.addr.quad_part = 0x%llX;\n"
+				"plane_state->address.grph.meta_addr.quad_part = 0x%llX;\n"
 				"plane_state->scaling_quality.h_taps = %d;\n"
 				"plane_state->scaling_quality.v_taps = %d;\n"
 				"plane_state->scaling_quality.h_taps_c = %d;\n"
@@ -193,8 +185,8 @@ void update_surface_trace(
 		SURFACE_TRACE("Update %d\n", i);
 		if (update->flip_addr) {
 			SURFACE_TRACE("flip_addr->address.type = %d;\n"
-					"flip_addr->address.grph.addr.quad_part = 0x%"PRIX64";\n"
-					"flip_addr->address.grph.meta_addr.quad_part = 0x%"PRIX64";\n"
+					"flip_addr->address.grph.addr.quad_part = 0x%llX;\n"
+					"flip_addr->address.grph.meta_addr.quad_part = 0x%llX;\n"
 					"flip_addr->flip_immediate = %d;\n",
 					update->flip_addr->address.type,
 					update->flip_addr->address.grph.addr.quad_part,
@@ -309,48 +301,10 @@ void post_surface_trace(struct dc *dc)
 
 }
 
-void context_timing_trace(
-		struct dc *dc,
-		struct resource_context *res_ctx)
-{
-	int i;
-	int h_pos[MAX_PIPES] = {0}, v_pos[MAX_PIPES] = {0};
-	struct crtc_position position;
-	unsigned int underlay_idx = dc->res_pool->underlay_pipe_index;
-	DC_LOGGER_INIT(dc->ctx->logger);
-
-
-	for (i = 0; i < dc->res_pool->pipe_count; i++) {
-		struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[i];
-		/* get_position() returns CRTC vertical/horizontal counter
-		 * hence not applicable for underlay pipe
-		 */
-		if (pipe_ctx->stream == NULL || pipe_ctx->pipe_idx == underlay_idx)
-			continue;
-
-		pipe_ctx->stream_res.tg->funcs->get_position(pipe_ctx->stream_res.tg, &position);
-		h_pos[i] = position.horizontal_count;
-		v_pos[i] = position.vertical_count;
-	}
-	for (i = 0; i < dc->res_pool->pipe_count; i++) {
-		struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[i];
-
-		if (pipe_ctx->stream == NULL || pipe_ctx->pipe_idx == underlay_idx)
-			continue;
-
-		TIMING_TRACE("OTG_%d   H_tot:%d  V_tot:%d   H_pos:%d  V_pos:%d\n",
-				pipe_ctx->stream_res.tg->inst,
-				pipe_ctx->stream->timing.h_total,
-				pipe_ctx->stream->timing.v_total,
-				h_pos[i], v_pos[i]);
-	}
-}
-
 void context_clock_trace(
 		struct dc *dc,
 		struct dc_state *context)
 {
-#if defined(CONFIG_DRM_AMD_DC_DCN)
 	DC_LOGGER_INIT(dc->ctx->logger);
 	CLOCK_TRACE("Current: dispclk_khz:%d  max_dppclk_khz:%d  dcfclk_khz:%d\n"
 			"dcfclk_deep_sleep_khz:%d  fclk_khz:%d  socclk_khz:%d\n",
@@ -368,5 +322,113 @@ void context_clock_trace(
 			context->bw_ctx.bw.dcn.clk.dcfclk_deep_sleep_khz,
 			context->bw_ctx.bw.dcn.clk.fclk_khz,
 			context->bw_ctx.bw.dcn.clk.socclk_khz);
-#endif
+}
+
+/**
+ * dc_status_to_str - convert dc_status to a human readable string
+ * @status: dc_status to be converted
+ *
+ * Return:
+ * A string describing the DC status.
+ */
+char *dc_status_to_str(enum dc_status status)
+{
+	switch (status) {
+	case DC_OK:
+		return "DC OK";
+	case DC_NO_CONTROLLER_RESOURCE:
+		return "No controller resource";
+	case DC_NO_STREAM_ENC_RESOURCE:
+		return "No stream encoder";
+	case DC_NO_CLOCK_SOURCE_RESOURCE:
+		return "No clock source";
+	case DC_FAIL_CONTROLLER_VALIDATE:
+		return "Controller validation failure";
+	case DC_FAIL_ENC_VALIDATE:
+		return "Encoder validation failure";
+	case DC_FAIL_ATTACH_SURFACES:
+		return "Surfaces attachment failure";
+	case DC_FAIL_DETACH_SURFACES:
+		return "Surfaces detachment failure";
+	case DC_FAIL_SURFACE_VALIDATE:
+		return "Surface validation failure";
+	case DC_NO_DP_LINK_BANDWIDTH:
+		return "No DP link bandwidth";
+	case DC_EXCEED_DONGLE_CAP:
+		return "Exceed dongle capability";
+	case DC_SURFACE_PIXEL_FORMAT_UNSUPPORTED:
+		return "Unsupported pixel format";
+	case DC_FAIL_BANDWIDTH_VALIDATE:
+		return "Bandwidth validation failure (BW and Watermark)";
+	case DC_FAIL_SCALING:
+		return "Scaling failure";
+	case DC_FAIL_DP_LINK_TRAINING:
+		return "DP link training failure";
+	case DC_FAIL_DSC_VALIDATE:
+		return "DSC validation failure";
+	case DC_NO_DSC_RESOURCE:
+		return "No DSC resource";
+	case DC_FAIL_UNSUPPORTED_1:
+		return "Unsupported";
+	case DC_FAIL_CLK_EXCEED_MAX:
+		return "Clk exceed max failure";
+	case DC_FAIL_CLK_BELOW_MIN:
+		return "Fail clk below minimum";
+	case DC_FAIL_CLK_BELOW_CFG_REQUIRED:
+		return "Fail clk below required CFG (hard_min in PPLIB)";
+	case DC_NOT_SUPPORTED:
+		return "The operation is not supported.";
+	case DC_UNSUPPORTED_VALUE:
+		return "The value specified is not supported.";
+	case DC_NO_LINK_ENC_RESOURCE:
+		return "No link encoder resource";
+	case DC_FAIL_DP_PAYLOAD_ALLOCATION:
+		return "Fail dp payload allocation";
+	case DC_FAIL_DP_LINK_BANDWIDTH:
+		return "Insufficient DP link bandwidth";
+	case DC_ERROR_UNEXPECTED:
+		return "Unexpected error";
+	}
+
+	return "Unexpected status error";
+}
+
+char *dc_pixel_encoding_to_str(enum dc_pixel_encoding pixel_encoding)
+{
+	switch (pixel_encoding) {
+	case PIXEL_ENCODING_RGB:
+		return "RGB";
+	case PIXEL_ENCODING_YCBCR422:
+		return "YUV422";
+	case PIXEL_ENCODING_YCBCR444:
+		return "YUV444";
+	case PIXEL_ENCODING_YCBCR420:
+		return "YUV420";
+	default:
+		return "Unknown";
+	}
+}
+
+char *dc_color_depth_to_str(enum dc_color_depth color_depth)
+{
+	switch (color_depth) {
+	case COLOR_DEPTH_666:
+		return "6-bpc";
+	case COLOR_DEPTH_888:
+		return "8-bpc";
+	case COLOR_DEPTH_101010:
+		return "10-bpc";
+	case COLOR_DEPTH_121212:
+		return "12-bpc";
+	case COLOR_DEPTH_141414:
+		return "14-bpc";
+	case COLOR_DEPTH_161616:
+		return "16-bpc";
+	case COLOR_DEPTH_999:
+		return "9-bpc";
+	case COLOR_DEPTH_111111:
+		return "11-bpc";
+	default:
+		return "Unknown";
+	}
 }

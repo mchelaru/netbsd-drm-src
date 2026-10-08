@@ -1,5 +1,3 @@
-/*	$NetBSD: dcn10_hw_sequencer_debug.h,v 1.2 2021/12/18 23:45:03 riastradh Exp $	*/
-
 /*
  * Copyright 2016 Advanced Micro Devices, Inc.
  *

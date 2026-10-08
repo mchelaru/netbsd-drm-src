@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_dce110_opp_v.c,v 1.2 2021/12/18 23:45:02 riastradh Exp $	*/
-
 /*
  * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
@@ -24,9 +22,6 @@
  * Authors: AMD
  *
  */
-
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_dce110_opp_v.c,v 1.2 2021/12/18 23:45:02 riastradh Exp $");
 
 #include "dm_services.h"
 

@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_dce_clk_mgr.c,v 1.2 2021/12/18 23:45:01 riastradh Exp $	*/
-
 /*
  * Copyright 2012-16 Advanced Micro Devices, Inc.
  *
@@ -25,9 +23,6 @@
  *
  */
 
-
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_dce_clk_mgr.c,v 1.2 2021/12/18 23:45:01 riastradh Exp $");
 
 #include "dccg.h"
 #include "clk_mgr_internal.h"
@@ -136,7 +131,7 @@ int dce_get_dp_ref_freq_khz(struct clk_mgr *clk_mgr_base)
 	struct clk_mgr_internal *clk_mgr = TO_CLK_MGR_INTERNAL(clk_mgr_base);
 	int dprefclk_wdivider;
 	int dprefclk_src_sel;
-	int dp_ref_clk_khz = 600000;
+	int dp_ref_clk_khz;
 	int target_div;
 
 	/* ASSERT DP Reference Clock source is from DFS*/
@@ -379,6 +374,8 @@ void dce_clock_read_ss_info(struct clk_mgr_internal *clk_mgr_dce)
 				clk_mgr_dce->dprefclk_ss_percentage =
 						info.spread_spectrum_percentage;
 			}
+			if (clk_mgr_dce->base.ctx->dc->config.ignore_dpref_ss)
+				clk_mgr_dce->dprefclk_ss_percentage = 0;
 		}
 	}
 }

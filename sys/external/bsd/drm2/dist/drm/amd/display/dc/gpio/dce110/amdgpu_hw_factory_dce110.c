@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_hw_factory_dce110.c,v 1.2 2021/12/18 23:45:04 riastradh Exp $	*/
-
 /*
  * Copyright 2013-15 Advanced Micro Devices, Inc.
  *
@@ -25,9 +23,6 @@
  *
  */
 
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_hw_factory_dce110.c,v 1.2 2021/12/18 23:45:04 riastradh Exp $");
-
 #include "dm_services.h"
 
 #include "include/gpio_types.h"
@@ -52,10 +47,6 @@ __KERNEL_RCSID(0, "$NetBSD: amdgpu_hw_factory_dce110.c,v 1.2 2021/12/18 23:45:04
 
 #define REGI(reg_name, block, id)\
 	mm ## block ## id ## _ ## reg_name
-
-#include "../hw_gpio.h"
-#include "../hw_ddc.h"
-#include "../hw_hpd.h"
 
 #include "reg_helper.h"
 #include "../hpd_regs.h"

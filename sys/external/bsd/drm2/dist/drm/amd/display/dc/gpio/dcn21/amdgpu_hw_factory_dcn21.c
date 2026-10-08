@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_hw_factory_dcn21.c,v 1.2 2021/12/18 23:45:05 riastradh Exp $	*/
-
 /*
  * Copyright 2013-15 Advanced Micro Devices, Inc.
  *
@@ -24,9 +22,6 @@
  * Authors: AMD
  *
  */
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_hw_factory_dcn21.c,v 1.2 2021/12/18 23:45:05 riastradh Exp $");
-
 #include "dm_services.h"
 #include "include/gpio_types.h"
 #include "../hw_factory.h"
@@ -207,7 +202,7 @@ static void define_hpd_registers(struct hw_gpio_pin *pin, uint32_t en)
 }
 
 
-/* fucntion table */
+/* function table */
 static const struct hw_factory_funcs funcs = {
 	.init_ddc_data = dal_hw_ddc_init,
 	.init_generic = dal_hw_generic_init,

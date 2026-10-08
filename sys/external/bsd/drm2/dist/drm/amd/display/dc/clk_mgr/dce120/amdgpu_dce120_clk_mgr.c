@@ -1,5 +1,3 @@
-/*	$NetBSD: amdgpu_dce120_clk_mgr.c,v 1.2 2021/12/18 23:45:01 riastradh Exp $	*/
-
 /*
  * Copyright 2012-16 Advanced Micro Devices, Inc.
  *
@@ -25,9 +23,6 @@
  *
  */
 
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: amdgpu_dce120_clk_mgr.c,v 1.2 2021/12/18 23:45:01 riastradh Exp $");
-
 #include "core_types.h"
 #include "clk_mgr_internal.h"
 
@@ -35,7 +30,7 @@ __KERNEL_RCSID(0, "$NetBSD: amdgpu_dce120_clk_mgr.c,v 1.2 2021/12/18 23:45:01 ri
 #include "dce110/dce110_clk_mgr.h"
 #include "dce120_clk_mgr.h"
 #include "dce100/dce_clk_mgr.h"
-#include "dce120/dce120_hw_sequencer.h"
+#include "dce120/dce120_hwseq.h"
 
 static const struct state_dependent_clocks dce120_max_clks_by_state[] = {
 /*ClocksStateInvalid - should not be used*/

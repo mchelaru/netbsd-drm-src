@@ -1,5 +1,3 @@
-/*	$NetBSD: dcn10_dwb.c,v 1.2 2021/12/18 23:45:03 riastradh Exp $	*/
-
 /*
  * Copyright 2012-17 Advanced Micro Devices, Inc.
  *
@@ -24,11 +22,6 @@
  * Authors: AMD
  *
  */
-
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: dcn10_dwb.c,v 1.2 2021/12/18 23:45:03 riastradh Exp $");
-
-#if defined(CONFIG_DRM_AMD_DC_DCN)
 
 #include "reg_helper.h"
 #include "resource.h"
@@ -134,6 +127,3 @@ void dcn10_dwbc_construct(struct dcn10_dwbc *dwbc10,
 	dwbc10->dwbc_shift = dwbc_shift;
 	dwbc10->dwbc_mask = dwbc_mask;
 }
-
-
-#endif

@@ -1,5 +1,3 @@
-/*	$NetBSD: reg_helper.h,v 1.2 2021/12/18 23:45:05 riastradh Exp $	*/
-
 /*
  * Copyright 2016 Advanced Micro Devices, Inc.
  *
@@ -496,6 +494,40 @@ uint32_t generic_indirect_reg_get(const struct dc_context *ctx,
 
 uint32_t generic_indirect_reg_update_ex(const struct dc_context *ctx,
 		uint32_t addr_index, uint32_t addr_data,
+		uint32_t index, uint32_t reg_val, int n,
+		uint8_t shift1, uint32_t mask1, uint32_t field_value1,
+		...);
+
+/* indirect register access
+ * underlying implementation determines which index/data pair to be used
+ * in a synchronous way
+ */
+#define IX_REG_SET_N_SYNC(index, n, initial_val, ...)	\
+		generic_indirect_reg_update_ex_sync(CTX, \
+				IND_REG(index), \
+				initial_val, \
+				n, __VA_ARGS__)
+
+#define IX_REG_SET_2_SYNC(index, init_value, f1, v1, f2, v2)	\
+		IX_REG_SET_N_SYNC(index, 2, init_value, \
+				FN(reg, f1), v1,\
+				FN(reg, f2), v2)
+
+#define IX_REG_GET_N_SYNC(index, n, ...) \
+		generic_indirect_reg_get_sync(CTX, \
+				IND_REG(index), \
+				n, __VA_ARGS__)
+
+#define IX_REG_GET_SYNC(index, field, val) \
+		IX_REG_GET_N_SYNC(index, 1, \
+				FN(data_reg_name, field), val)
+
+uint32_t generic_indirect_reg_get_sync(const struct dc_context *ctx,
+		uint32_t index, int n,
+		uint8_t shift1, uint32_t mask1, uint32_t *field_value1,
+		...);
+
+uint32_t generic_indirect_reg_update_ex_sync(const struct dc_context *ctx,
 		uint32_t index, uint32_t reg_val, int n,
 		uint8_t shift1, uint32_t mask1, uint32_t field_value1,
 		...);

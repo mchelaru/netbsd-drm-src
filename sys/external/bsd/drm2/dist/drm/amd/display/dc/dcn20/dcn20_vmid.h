@@ -1,5 +1,3 @@
-/*	$NetBSD: dcn20_vmid.h,v 1.2 2021/12/18 23:45:03 riastradh Exp $	*/
-
 /*
  * Copyright 2018 Advanced Micro Devices, Inc.
  *
@@ -29,19 +27,6 @@
 #define DAL_DC_DCN20_DCN20_VMID_H_
 
 #include "vmid.h"
-
-#define BASE_INNER(seg) \
-	DCE_BASE__INST0_SEG ## seg
-
-#define BASE(seg) \
-	BASE_INNER(seg)
-
-#define SRI(reg_name, block, id)\
-	.reg_name = BASE(mm ## block ## id ## _ ## reg_name ## _BASE_IDX) + \
-					mm ## block ## id ## _ ## reg_name
-
-#define SF(reg_name, field_name, post_fix)\
-	.field_name = reg_name ## __ ## field_name ## post_fix
 
 #define DCN20_VMID_REG_LIST(id)\
 	SRI(CNTL, DCN_VM_CONTEXT, id),\

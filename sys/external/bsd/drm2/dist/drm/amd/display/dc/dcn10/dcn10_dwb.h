@@ -1,5 +1,3 @@
-/*	$NetBSD: dcn10_dwb.h,v 1.2 2021/12/18 23:45:03 riastradh Exp $	*/
-
 /* Copyright 2012-17 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -25,8 +23,6 @@
  */
 #ifndef __DC_DWBC_DCN10_H__
 #define __DC_DWBC_DCN10_H__
-
-#if defined(CONFIG_DRM_AMD_DC_DCN)
 
 /* DCN */
 #define BASE_INNER(seg) \
@@ -267,7 +263,5 @@ void dcn10_dwbc_construct(struct dcn10_dwbc *dwbc10,
 		const struct dcn10_dwbc_shift *dwbc_shift,
 		const struct dcn10_dwbc_mask *dwbc_mask,
 		int inst);
-
-#endif
 
 #endif
