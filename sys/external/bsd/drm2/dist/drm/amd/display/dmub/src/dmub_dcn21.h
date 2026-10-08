@@ -1,5 +1,3 @@
-/*	$NetBSD: dmub_dcn21.h,v 1.2 2021/12/18 23:45:07 riastradh Exp $	*/
-
 /*
  * Copyright 2019 Advanced Micro Devices, Inc.
  *
@@ -33,11 +31,5 @@
 /* Registers. */
 
 extern const struct dmub_srv_common_regs dmub_srv_dcn21_regs;
-
-/* Hardware functions. */
-
-bool dmub_dcn21_is_auto_load_done(struct dmub_srv *dmub);
-
-bool dmub_dcn21_is_phy_init(struct dmub_srv *dmub);
 
 #endif /* _DMUB_DCN21_H_ */

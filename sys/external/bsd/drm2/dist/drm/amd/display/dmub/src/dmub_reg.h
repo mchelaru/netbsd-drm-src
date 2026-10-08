@@ -1,5 +1,3 @@
-/*	$NetBSD: dmub_reg.h,v 1.2 2021/12/18 23:45:07 riastradh Exp $	*/
-
 /*
  * Copyright 2019 Advanced Micro Devices, Inc.
  *
@@ -28,7 +26,7 @@
 #ifndef _DMUB_REG_H_
 #define _DMUB_REG_H_
 
-#include "../inc/dmub_types.h"
+#include "../inc/dmub_cmd.h"
 
 struct dmub_srv;
 
@@ -110,7 +108,6 @@ struct dmub_srv;
 				FN(reg, f4), v4)
 
 /* Register field getting. */
-
 #define REG_GET(reg_name, field, val) \
 	dmub_reg_get(CTX, REG(reg_name), FN(reg_name, field), val)
 
