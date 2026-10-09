@@ -41,6 +41,7 @@ __KERNEL_RCSID(0, "$NetBSD: amdgpu_pci.c,v 1.12 2023/08/07 16:34:47 riastradh Ex
 #include <dev/pci/pcivar.h>
 
 #include <linux/pci.h>
+#include <linux/slab.h>
 
 #include <drm/drm_device.h>
 #include <drm/drm_drv.h>
@@ -65,6 +66,8 @@ struct amdgpu_softc {
 	struct drm_device		*sc_drm_dev;
 	struct pci_dev			sc_pci_dev;
 	bool				sc_pci_attached;
+	bool				sc_pci_enabled;
+	bool				sc_kms_loaded;
 	bool				sc_dev_registered;
 };
 
@@ -73,6 +76,7 @@ static bool	amdgpu_pci_lookup(const struct pci_attach_args *,
 
 static int	amdgpu_match(device_t, cfdata_t, void *);
 static void	amdgpu_attach(device_t, device_t, void *);
+static void	amdgpu_attach_schedule(device_t);
 static void	amdgpu_attach_real(device_t);
 static int	amdgpu_detach(device_t, int);
 static bool	amdgpu_do_suspend(device_t, const pmf_qual_t *);
@@ -155,8 +159,18 @@ amdgpu_attach(device_t parent, device_t self, void *aux)
 	/*
 	 * Defer the remainder of initialization until we have mounted
 	 * the root file system and can load firmware images.
+	 *
+	 * Start with a well deserved break, otherwise iwm firmware
+	 * on my pc misses its alive interrupt. Maybe FIXME, idk
 	 */
-	config_mountroot(self, &amdgpu_attach_real);
+	config_mountroot(self, &amdgpu_attach_schedule);
+}
+
+static void
+amdgpu_attach_schedule(device_t self)
+{
+	kpause("amdgpuat", false, 2 * hz, NULL);
+	amdgpu_attach_real(self);
 }
 
 static void
@@ -164,6 +178,8 @@ amdgpu_attach_real(device_t self)
 {
 	struct amdgpu_softc *const sc = device_private(self);
 	const struct pci_attach_args *const pa = &sc->sc_pa;
+	struct amdgpu_device *adev;
+	struct drm_device *ddev;
 	bool ok __diagused;
 	unsigned long flags = 0; /* XXXGCC */
 	int error;
@@ -177,29 +193,94 @@ amdgpu_attach_real(device_t self)
 	 */
 	sc->sc_task_thread = curlwp;
 
-	sc->sc_drm_dev = drm_dev_alloc(amdgpu_drm_driver, self);
-	if (IS_ERR(sc->sc_drm_dev)) {
-		aprint_error_dev(self, "unable to create drm device: %ld\n",
-		    PTR_ERR(sc->sc_drm_dev));
-		sc->sc_drm_dev = NULL;
+	/*
+	 * Allocate the outer amdgpu_device that embeds drm_device.
+	 * Linux does this with devm_drm_dev_alloc(); NetBSD has no
+	 * managed DRM alloc, so we mirror that with kzalloc +
+	 * drm_dev_init and free from amdgpu_driver_release_kms.
+	 */
+	adev = kzalloc(sizeof(*adev), GFP_KERNEL);
+	if (adev == NULL) {
+		aprint_error_dev(self, "unable to allocate amdgpu device\n");
 		goto out;
 	}
 
 	/* XXX errno Linux->NetBSD */
-	error = -drm_pci_attach(sc->sc_drm_dev, &sc->sc_pci_dev);
+	error = -drm_dev_init(&adev->ddev, amdgpu_drm_driver, self);
+	if (error) {
+		aprint_error_dev(self, "unable to init drm device: %d\n",
+		    error);
+		kfree(adev);
+		goto out;
+	}
+	ddev = &adev->ddev;
+	sc->sc_drm_dev = ddev;
+
+	adev->dev = pci_dev_dev(&sc->sc_pci_dev);
+	adev->pdev = &sc->sc_pci_dev;
+	ddev->dev_private = adev;
+
+	if (amdgpu_virtual_display ||
+	    amdgpu_device_asic_has_dc_support(flags & AMD_ASIC_MASK))
+		; /* keep DRIVER_ATOMIC from drm_driver */
+	else
+		ddev->driver_features &= ~DRIVER_ATOMIC;
+
+	if ((flags & AMD_EXP_HW_SUPPORT) && !amdgpu_exp_hw_support) {
+		aprint_error_dev(self,
+		    "experimental hardware support required "
+		    "(amdgpu.exp_hw_support)\n");
+		goto err_put;
+	}
+
+	/* XXX errno Linux->NetBSD */
+	error = -drm_pci_attach(ddev, &sc->sc_pci_dev);
 	if (error) {
 		aprint_error_dev(self, "unable to attach drm: %d\n", error);
-		goto out;
+		goto err_put;
 	}
 	sc->sc_pci_attached = true;
 
+	error = linux_pci_enable_device(&sc->sc_pci_dev);
+	if (error) {
+		aprint_error_dev(self, "unable to enable pci device: %d\n",
+		    error);
+		goto err_put;
+	}
+	sc->sc_pci_enabled = true;
+
+	pci_set_drvdata(&sc->sc_pci_dev, ddev);
+
 	/* XXX errno Linux->NetBSD */
-	error = -drm_dev_register(sc->sc_drm_dev, flags);
+	error = -amdgpu_driver_load_kms(adev, flags);
+	if (error) {
+		aprint_error_dev(self, "unable to load kms: %d\n", error);
+		goto err_put;
+	}
+	sc->sc_kms_loaded = true;
+
+	/* XXX errno Linux->NetBSD */
+	error = -drm_dev_register(ddev, flags);
 	if (error) {
 		aprint_error_dev(self, "unable to register drm: %d\n", error);
-		goto out;
+		goto err_unload;
 	}
 	sc->sc_dev_registered = true;
+
+	/*
+	 * Linux uses drm_client_setup - drm_fbdev_ttm after register; on
+	 * NetBSD that is a no-op stub.  Call classic amdgpu_fbdev_init so
+	 * amdgpufb is config_found'd and its attach_task is queued onto
+	 * sc_tasks below (console before init(8) opens /dev/console).
+	 */
+	if (adev->mode_info.mode_config_initialized &&
+	    !list_empty(&ddev->mode_config.connector_list)) {
+		/* XXX errno Linux->NetBSD - TODO mapper */
+		error = -amdgpu_fbdev_init(adev);
+		if (error)
+			aprint_error_dev(self,
+			    "amdgpu_fbdev_init failed: %d\n", error);
+	}
 
 	if (!pmf_device_register(self, &amdgpu_do_suspend, &amdgpu_do_resume))
 		aprint_error_dev(self, "unable to establish power handler\n");
@@ -218,7 +299,24 @@ amdgpu_attach_real(device_t self)
 		(*task->rt_fn)(task);
 	}
 
-out:	/* Cause any subesquent tasks to be processed by the workqueue.  */
+	goto out;
+
+err_unload:
+	amdgpu_driver_unload_kms(ddev);
+	sc->sc_kms_loaded = false;
+err_put:
+	if (sc->sc_pci_enabled) {
+		linux_pci_disable_device(&sc->sc_pci_dev);
+		sc->sc_pci_enabled = false;
+	}
+	if (sc->sc_pci_attached) {
+		drm_pci_detach(ddev);
+		sc->sc_pci_attached = false;
+	}
+	pci_set_drvdata(&sc->sc_pci_dev, NULL);
+	drm_dev_put(ddev);
+	sc->sc_drm_dev = NULL;
+out:	/* Cause any subsequent tasks to be processed by the workqueue.  */
 	atomic_store_relaxed(&sc->sc_task_thread, NULL);
 }
 
@@ -237,10 +335,22 @@ amdgpu_detach(device_t self, int flags)
 	KASSERT(SIMPLEQ_EMPTY(&sc->sc_tasks));
 
 	pmf_device_deregister(self);
-	if (sc->sc_dev_registered)
+	if (sc->sc_dev_registered) {
 		drm_dev_unregister(sc->sc_drm_dev);
-	if (sc->sc_pci_attached)
+		sc->sc_dev_registered = false;
+	}
+	if (sc->sc_kms_loaded) {
+		amdgpu_driver_unload_kms(sc->sc_drm_dev);
+		sc->sc_kms_loaded = false;
+	}
+	if (sc->sc_pci_enabled) {
+		linux_pci_disable_device(&sc->sc_pci_dev);
+		sc->sc_pci_enabled = false;
+	}
+	if (sc->sc_pci_attached) {
 		drm_pci_detach(sc->sc_drm_dev);
+		sc->sc_pci_attached = false;
+	}
 	if (sc->sc_drm_dev) {
 		drm_dev_put(sc->sc_drm_dev);
 		sc->sc_drm_dev = NULL;
