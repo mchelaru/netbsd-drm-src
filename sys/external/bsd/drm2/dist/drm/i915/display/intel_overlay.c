@@ -185,6 +185,7 @@ struct overlay_registers {
 #  define	__intel_overlay_iomem
 #  define	__iomem			__intel_overlay_iomem
 
+#  undef	iowrite32
 static inline void
 iowrite32(uint32_t value, uint32_t __intel_overlay_iomem *ptr)
 {

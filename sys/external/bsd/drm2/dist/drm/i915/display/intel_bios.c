@@ -1974,6 +1974,8 @@ bool intel_bios_is_valid_vbt(const void *buf, size_t size)
 
 #ifdef __NetBSD__
 #  define	__iomem	__pci_rom_iomem
+#  undef	ioread16
+#  undef	ioread32
 #  define	ioread16	fake_ioread16
 #  define	ioread32	fake_ioread32
 static inline uint16_t
@@ -2058,6 +2060,7 @@ err_unmap_oprom:
 
 #ifdef __NetBSD__
 #  undef	__iomem
+#  undef	ioread16
 #  undef	ioread32
 #endif
 

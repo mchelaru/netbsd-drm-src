@@ -153,7 +153,6 @@ void i915_sw_fence_fini(struct i915_sw_fence *fence)
 
 /* XXX whattakludge */
 
-typedef struct i915_sw_fence_queue wait_queue_head_t;
 typedef struct i915_sw_fence_waiter wait_queue_entry_t;
 
 #define	TASK_NORMAL	0
@@ -204,7 +203,7 @@ i915_sw_fence_wait(struct i915_sw_fence *fence)
 static void __i915_sw_fence_wake_up_all(struct i915_sw_fence *fence,
 					struct list_head *continuation)
 {
-	wait_queue_head_t *x = &fence->wait;
+	struct i915_sw_fence_queue *x = &fence->wait;
 	wait_queue_entry_t *pos, *next;
 	unsigned long flags;
 

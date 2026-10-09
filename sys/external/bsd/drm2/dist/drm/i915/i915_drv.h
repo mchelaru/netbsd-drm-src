@@ -902,6 +902,7 @@ struct i915_selftest_stash {
 
 #ifdef __NetBSD__
 #  define	__i915_iomem
+#  undef	__iomem
 #  define	__iomem __i915_iomem
 #endif
 

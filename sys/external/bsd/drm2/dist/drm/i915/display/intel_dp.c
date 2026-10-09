@@ -1184,7 +1184,7 @@ intel_dp_aux_wait_done(struct intel_dp *intel_dp)
 {
 	struct drm_i915_private *i915 = dp_to_i915(intel_dp);
 	i915_reg_t ch_ctl = intel_dp->aux_ch_ctl_reg(intel_dp);
-	enum { timeout_ms = 10 };
+	const unsigned int timeout_ms = 10;
 	u32 status;
 	bool done;
 
