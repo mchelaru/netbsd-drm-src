@@ -37,8 +37,9 @@ __KERNEL_RCSID(0, "$NetBSD: ttm_bus_dma.c,v 1.10 2021/12/19 11:32:54 riastradh E
 #include <uvm/uvm_extern.h>
 
 #include <drm/bus_dma_hacks.h>
-#include <ttm/ttm_bo_driver.h>
-#include <ttm/ttm_page_alloc.h>
+#include <drm/ttm/ttm_tt.h>
+#include <drm/ttm/ttm_device.h>
+#include <drm/ttm/ttm_page_alloc.h>
 
 /*
  * ttm_bus_dma_populate(ttm_dma)
