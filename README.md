@@ -1,3 +1,28 @@
+Note
+======
+
+This is my changeset in order to use amdgpu module with my card - 
+Radeon 780M, coming with an AMD Ryzen 7 8845HS. It's applied on top
+of NetBSD 11.0. It's a minimal changeset, much of the stuff is disabled - e.g. AGP etc.
+
+My card PCI ID is 0x1002 0x1900, but I suspect that this changeset
+works with other newer Radeons. If you want to give it a try you
+have to add your pci id in `sys/external/bsd/drm2/dist/drm/amd/amdgpu/amdgpu_drv.c`.
+Unlike Linux, wildcard probing is disabled.
+
+You will also need the newer amdgpu firmware from [here](https://gitlab.com/kernel-firmware/linux-firmware/-/tree/main/amdgpu?ref_type=heads).
+Just drop all the files there in `/libdata/firmware/amdgpu/`
+
+You will also need to load the amdgpu module on boot, this is a `boot.cfg` entry that I use:
+`menu=Boot with amdgpu:rndseed /var/db/entropy-file;load drmkms_sched;load drmkms_ttm;load amdgpu;gop 0;boot`
+
+Use this on your own risk, I am not responsible for anything.
+License: I don't care, free to copy and free to use it as you find useful.
+Just don't mention my name, I don't want to be associated with anything weird.
+
+Below, the original README.
+
+
 NetBSD
 ======
 
