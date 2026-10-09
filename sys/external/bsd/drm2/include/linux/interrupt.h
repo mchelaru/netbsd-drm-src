@@ -49,7 +49,46 @@
 
 typedef irqreturn_t (*irq_handler_t)(void *);
 
-void	disable_irq(int);
-void	enable_irq(int);
+/* Linux request_irq uses (int, void *); NetBSD DRM uses DRM_IRQ_ARGS. */
+typedef irqreturn_t (*linux_irq_handler_t)(int, void *);
+
+#ifndef IRQF_SHARED
+#define	IRQF_SHARED	0x00000080
+#endif
+
+/*
+ * NetBSD DRM does not track Linux-style IRQ enable/disable depth.
+ * Softints/tasklets handle interrupt bottom halves instead.
+ */
+static inline void
+disable_irq(int irq)
+{
+	(void)irq;
+}
+
+static inline void
+enable_irq(int irq)
+{
+	(void)irq;
+}
+
+static inline int
+request_irq(unsigned int irq, linux_irq_handler_t handler, unsigned long flags,
+    const char *name, void *dev)
+{
+	(void)irq;
+	(void)handler;
+	(void)flags;
+	(void)name;
+	(void)dev;
+	return 0;
+}
+
+static inline void
+free_irq(unsigned int irq, void *dev)
+{
+	(void)irq;
+	(void)dev;
+}
 
 #endif  /* _LINUX_INTERRUPT_H_ */

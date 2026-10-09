@@ -32,4 +32,54 @@
 #ifndef _LINUX_DEBUGFS_H_
 #define _LINUX_DEBUGFS_H_
 
+#include <sys/types.h>
+#include <sys/null.h>
+
+#include <linux/atomic.h>
+
+struct dentry;
+struct file_operations;
+
+struct debugfs_blob_wrapper {
+	void	*data;
+	unsigned long size;
+};
+
+static inline struct dentry *
+debugfs_create_dir(const char *name, struct dentry *parent)
+{
+	(void)name;
+	(void)parent;
+	return NULL;
+}
+
+static inline struct dentry *
+debugfs_create_file(const char *name, mode_t mode, struct dentry *parent,
+    void *data, const struct file_operations *fops)
+{
+	(void)name;
+	(void)mode;
+	(void)parent;
+	(void)data;
+	(void)fops;
+	return NULL;
+}
+
+static inline void
+debugfs_remove(struct dentry *dentry)
+{
+	(void)dentry;
+}
+
+static inline struct dentry *
+debugfs_create_atomic_t(const char *name, mode_t mode, struct dentry *parent,
+    atomic_t *value)
+{
+	(void)name;
+	(void)mode;
+	(void)parent;
+	(void)value;
+	return NULL;
+}
+
 #endif  /* _LINUX_DEBUGFS_H_ */

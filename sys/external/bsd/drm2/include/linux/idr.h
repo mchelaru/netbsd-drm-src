@@ -126,6 +126,16 @@ ida_alloc_max(struct ida *ida, unsigned max, gfp_t gfp)
 	return ida_simple_get(ida, 0, max + 1, gfp);
 }
 
+static inline int
+ida_alloc_range(struct ida *ida, unsigned int min, unsigned int max, gfp_t gfp)
+{
+
+	return ida_simple_get(ida, min, max + 1, gfp);
+}
+
+/* XXX amdgpu: NetBSD ida has no static IDR_INIT; BSS + first use via idr_alloc. */
+#define	DEFINE_IDA(name)	struct ida name
+
 static inline void
 ida_simple_remove(struct ida *ida, unsigned int id)
 {

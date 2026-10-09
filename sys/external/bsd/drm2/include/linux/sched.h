@@ -58,10 +58,23 @@ struct seq_file;
 
 #define	current	curproc
 
+/* Linux schedule() yields; NetBSD equivalent. */
+static inline void
+schedule(void)
+{
+	yield();
+}
+
 static inline pid_t
 task_pid_nr(struct proc *p)
 {
 	return p->p_pid;
+}
+
+static inline void
+get_task_comm(char *buf, struct proc *p)
+{
+	strlcpy(buf, p->p_comm, TASK_COMM_LEN);
 }
 
 static inline long

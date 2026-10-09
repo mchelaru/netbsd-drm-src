@@ -121,4 +121,34 @@ pm_runtime_get_if_in_use(struct device *dev __unused)
 	return 1;
 }
 
+/* XXX amdgpu: additional runtime PM stubs */
+static inline void
+pm_runtime_enable(struct device *dev __unused)
+{
+}
+
+static inline int
+pm_runtime_resume(struct device *dev __unused)
+{
+	return 0;
+}
+
+static inline unsigned long
+pm_runtime_autosuspend_expiration(struct device *dev __unused)
+{
+	return 0;
+}
+
+static inline bool
+pm_runtime_status_suspended(struct device *dev __unused)
+{
+	return false;
+}
+
+static inline int
+pm_runtime_suspend(struct device *dev __unused)
+{
+	return 0;
+}
+
 #endif  /* _LINUX_PM_RUNTIME_H_ */

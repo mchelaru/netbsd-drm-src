@@ -33,6 +33,7 @@
 
 #include <linux/dma-fence.h>
 #include <linux/irq_work.h>
+#include <linux/slab.h>
 
 struct dma_fence_chain {
 	/* Linux API */
@@ -63,5 +64,27 @@ struct dma_fence *
 	for ((VAR) = dma_fence_get(FENCE);				      \
 		(VAR) != NULL;						      \
 		(VAR) = dma_fence_chain_walk(VAR))
+
+/*
+ * Linux specialized allocator macros.  Typecast matches upstream for
+ * type safety; NetBSD has no separate alloc_tag accounting.
+ */
+#define	dma_fence_chain_alloc()						      \
+	((struct dma_fence_chain *)kmalloc(sizeof(struct dma_fence_chain),    \
+	    GFP_KERNEL))
+
+static inline void
+dma_fence_chain_free(struct dma_fence_chain *chain)
+{
+	kfree(chain);
+}
+
+static inline struct dma_fence *
+dma_fence_chain_contained(struct dma_fence *fence)
+{
+	struct dma_fence_chain *chain = to_dma_fence_chain(fence);
+
+	return chain ? chain->dfc_fence : fence;
+}
 
 #endif	/* _LINUX_DMA_FENCE_CHAIN_H_ */

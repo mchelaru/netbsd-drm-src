@@ -39,4 +39,7 @@
 #define	register_pm_notifier(n)		__nothing
 #define	unregister_pm_notifier(n)	__nothing
 
+#define	pm_resume_via_firmware()	(0)
+#define	pm_suspend_via_firmware()	(0)
+
 #endif  /* _LINUX_SUSPEND_H_ */

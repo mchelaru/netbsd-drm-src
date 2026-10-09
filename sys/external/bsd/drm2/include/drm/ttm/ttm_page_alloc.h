@@ -32,7 +32,7 @@
 #ifndef _DRM_TTM_TTM_PAGE_ALLOC_H_
 #define _DRM_TTM_TTM_PAGE_ALLOC_H_
 
-#include <drm/ttm/ttm_bo_driver.h>
+#include <drm/ttm/ttm_tt.h>
 
 struct ttm_dma_tt;
 struct ttm_mem_global;

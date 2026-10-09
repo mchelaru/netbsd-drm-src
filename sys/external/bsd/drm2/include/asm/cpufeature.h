@@ -43,6 +43,7 @@
 
 #define	X86_FEATURE_CLFLUSH	0
 #define	X86_FEATURE_PAT		1
+#define	X86_FEATURE_HYPERVISOR	2
 
 static inline bool
 static_cpu_has(int feature)
@@ -52,6 +53,8 @@ static_cpu_has(int feature)
 		return cpu_has_clflush;
 	case X86_FEATURE_PAT:
 		return cpu_has_pat;
+	case X86_FEATURE_HYPERVISOR:
+		return false;	/* XXX: detect VM guest */
 	default:
 		return false;
 	}

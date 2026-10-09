@@ -32,4 +32,86 @@
 #ifndef _LINUX_WAIT_H_
 #define _LINUX_WAIT_H_
 
+#include <sys/types.h>
+#include <sys/condvar.h>
+#include <sys/systm.h>
+#include <sys/errno.h>
+
+#include <linux/spinlock.h>
+
+/*
+ * Minimal wait-queue stub for embedding in Linux DRM structures.
+ * Full wait_event semantics are not ported; callers that sleep will
+ * need further work.  @lock matches Linux spinlock_t so code that does
+ * spin_lock(&wq.lock) type-checks.
+ */
+typedef struct wait_queue_head {
+	spinlock_t	lock;
+	kcondvar_t	cv;
+} wait_queue_head_t;
+
+static inline void
+init_waitqueue_head(wait_queue_head_t *wq)
+{
+	spin_lock_init(&wq->lock);
+	cv_init(&wq->cv, "lnxwq");
+}
+
+static inline void
+wake_up(wait_queue_head_t *wq)
+{
+	spin_lock(&wq->lock);
+	cv_broadcast(&wq->cv);
+	spin_unlock(&wq->lock);
+}
+
+static inline void
+wake_up_all(wait_queue_head_t *wq)
+{
+	wake_up(wq);
+}
+
+static inline void
+wake_up_interruptible(wait_queue_head_t *wq)
+{
+	wake_up(wq);
+}
+
+/* Caller already holds wq->lock. */
+static inline void
+wake_up_all_locked(wait_queue_head_t *wq)
+{
+	cv_broadcast(&wq->cv);
+}
+
+/* XXX amdgpu: no real sleep; succeed only if CONDITION already true. */
+#define	wait_event(wq, CONDITION)					\
+	do {								\
+		if (!(CONDITION)) {					\
+			/* XXX spin/sleep not implemented */		\
+		}							\
+	} while (/*CONSTCOND*/0)
+
+#define	wait_event_interruptible(wq, CONDITION)				\
+	({								\
+		int __ret = 0;						\
+		if (!(CONDITION))					\
+			__ret = -ERESTARTSYS; /* XXX no sleep */	\
+		__ret;							\
+	})
+
+/* Like wait_event_interruptible, but caller already holds wq.lock. */
+#define	wait_event_interruptible_locked(wq, CONDITION)			\
+	wait_event_interruptible(wq, CONDITION)
+
+/* XXX amdgpu: no real timed sleep; succeed only if CONDITION already true. */
+#define	wait_event_interruptible_timeout(wq, CONDITION, TIMEOUT)	\
+	({								\
+		long __ret = (TIMEOUT);					\
+		(void)(wq);						\
+		if (!(CONDITION))					\
+			__ret = -ERESTARTSYS; /* XXX no sleep */	\
+		__ret;							\
+	})
+
 #endif  /* _LINUX_WAIT_H_ */

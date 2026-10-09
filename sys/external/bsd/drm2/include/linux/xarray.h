@@ -30,6 +30,7 @@
 #define	_LINUX_XARRAY_H_
 
 #include <sys/rbtree.h>
+#include <sys/mutex.h>
 
 #include <linux/slab.h>
 
@@ -65,6 +66,7 @@ xa_err(void *cookie)
 }
 
 #define	XA_FLAGS_ALLOC	0
+#define	XA_FLAGS_LOCK_IRQ	0
 
 #define	xa_alloc	linux_xa_alloc
 #define	xa_destroy	linux_xa_destroy
@@ -75,6 +77,32 @@ xa_err(void *cookie)
 #define	xa_limit_32b	linux_xa_limit_32b
 #define	xa_load		linux_xa_load
 #define	xa_store	linux_xa_store
+
+/*
+ * Linux xarray irqsave helpers. NetBSD uses a kmutex at IPL_VM, so the
+ * flags argument is unused; enter/exit already run at the right IPL.
+ */
+#define	xa_lock_irqsave(xa, flags)					\
+	do {								\
+		(void)(flags);						\
+		mutex_enter(&(xa)->xa_lock);				\
+	} while (0)
+#define	xa_unlock_irqrestore(xa, flags)					\
+	do {								\
+		(void)(flags);						\
+		mutex_exit(&(xa)->xa_lock);				\
+	} while (0)
+
+/* IRQ variants: NetBSD xa_store/xa_erase already take xa_lock. */
+#define	xa_erase_irq(xa, index)		xa_erase((xa), (index))
+#define	xa_store_irq(xa, index, entry, gfp)				\
+	xa_store((xa), (index), (entry), (gfp))
+
+static inline bool
+xa_empty(const struct xarray *xa)
+{
+	return xa->xa_tree.rbt_root == NULL;
+}
 
 void	xa_init_flags(struct xarray *, gfp_t);
 void	xa_destroy(struct xarray *);

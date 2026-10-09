@@ -43,6 +43,7 @@
 #include <linux/rcupdate.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
+#include <linux/wait.h>
 
 struct dma_fence_cb;
 

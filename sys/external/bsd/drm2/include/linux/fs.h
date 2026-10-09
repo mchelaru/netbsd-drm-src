@@ -39,6 +39,20 @@
 #include <linux/err.h>
 #include <linux/wait_bit.h>
 
+/*
+ * Linux filp->f_mapping is the associated address_space.  On NetBSD,
+ * TTM swap storage is a uvm_object stored in f_data when a struct file
+ * is used; map the field name for source compatibility.
+ */
+#ifndef f_mapping
+#define	f_mapping	f_data
+#endif
+
+/* Linux address_space roughly corresponds to a uvm_object here. */
+#ifndef address_space
+#define	address_space	uvm_object
+#endif
+
 static inline struct uvm_object *
 file_inode(struct uvm_object *uobj)
 {

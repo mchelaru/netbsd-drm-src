@@ -118,13 +118,22 @@ vmap(struct page **pages, unsigned npages, unsigned long flags,
 }
 
 /*
- * vunmap(ptr, npages)
+ * vunmap(ptr)
  *
- *	Unmap the KVA pages starting at ptr that were mapped by a call
- *	to vmap with the same npages parameter.
+ *	FIXME: Linux unmaps by address only so we leak here
  */
 static inline void
-vunmap(void *ptr, unsigned npages)
+vunmap(void *ptr)
+{
+	(void)ptr;
+}
+
+/*
+ * Unmap the KVA pages starting at ptr that were mapped by a call
+ * to vmap with the same npages parameter.
+ */
+static inline void
+vunmap_npages(void *ptr, unsigned npages)
 {
 	vaddr_t va = (vaddr_t)ptr;
 
@@ -140,6 +149,20 @@ vunmap(void *ptr, unsigned npages)
 	 */
 	uvm_km_free(kernel_map, va, (vsize_t)npages << PAGE_SHIFT,
 	    UVM_KMF_VAONLY);
+}
+
+static inline void *
+vmalloc_to_page(const void *addr)
+{
+	(void)addr;
+	return NULL;
+}
+
+static inline void *
+virt_to_page(const void *addr)
+{
+	(void)addr;
+	return NULL;
 }
 
 static inline int

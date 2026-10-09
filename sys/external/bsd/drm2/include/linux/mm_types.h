@@ -37,13 +37,25 @@
 #include <uvm/uvm_page.h>	/* XXX don't expose this */
 
 #include <linux/completion.h>
+#include <linux/list.h>
 #include <linux/rwsem.h>
 
 struct page {
 	struct vm_page p_vmp;
+	struct list_head lru;	/* Linux page LRU / TTM pool lists */
+	unsigned long private;	/* Linux page->private */
 };
 
 typedef unsigned pgprot_t;
+
+/* Linux mm fault return type; unused by NetBSD UVM fault paths. */
+typedef unsigned int vm_fault_t;
+
+struct vm_area_struct;
+struct vm_fault;
+struct mm_struct;
+struct address_space;
+struct file;
 
 static inline unsigned
 pgprot_val(pgprot_t pgprot)

@@ -76,4 +76,24 @@ void up_read(struct rw_semaphore *);
 void up_write(struct rw_semaphore *);
 void downgrade_write(struct rw_semaphore *);
 
+static inline bool
+rwsem_is_contended(struct rw_semaphore *sem)
+{
+	bool contended;
+
+	mutex_enter(&sem->rws_lock);
+	contended = sem->rws_writewanted || sem->rws_readers > 1;
+	mutex_exit(&sem->rws_lock);
+	return contended;
+}
+
+#define	DECLARE_RWSEM(name)						      \
+	struct rw_semaphore name;					      \
+	static void __CONCAT(__linux_rwsem_ctor_, name)(void)		      \
+	    __attribute__((__constructor__, __used__));			      \
+	static void __CONCAT(__linux_rwsem_ctor_, name)(void)		      \
+	{								      \
+		init_rwsem(&name);					      \
+	}
+
 #endif  /* _LINUX_RWSEM_H_ */

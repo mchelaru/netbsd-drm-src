@@ -82,6 +82,12 @@ div64_u64_rem(uint64_t dividend, uint64_t divisor, uint64_t *rem)
 	return dividend / divisor;
 }
 
+static inline unsigned long
+div64_ul(uint64_t dividend, unsigned long divisor)
+{
+	return (unsigned long)(dividend / divisor);
+}
+
 static inline uint64_t
 mul_u32_u32(uint32_t a, uint32_t b)
 {

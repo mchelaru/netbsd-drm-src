@@ -1,4 +1,4 @@
-/*	$NetBSD: shrinker.h,v 1.5 2021/12/19 01:22:37 riastradh Exp $	*/
+/*	$NetBSD: shrinker.h,v 1.6 2026/05/03 16:02:35 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 2013 The NetBSD Foundation, Inc.
@@ -32,6 +32,7 @@
 #ifndef _LINUX_SHRINKER_H_
 #define _LINUX_SHRINKER_H_
 
+#include <sys/kmem.h>
 #include <uvm/uvm.h>
 
 struct shrink_control {
@@ -50,6 +51,7 @@ struct shrinker {
 };
 
 #define	SHRINK_STOP	(~0UL)
+#define	SHRINK_EMPTY	(~0UL - 1)
 
 #define	DEFAULT_SEEKS	2	/* XXX cargo-culted from Linux */
 
@@ -64,10 +66,32 @@ unregister_shrinker(struct shrinker *shrinker __unused)
 {
 }
 
+static inline struct shrinker *
+shrinker_alloc(unsigned int flags, const char *fmt, ...)
+{
+	(void)flags;
+	(void)fmt;
+	/* NetBSD has no MM shrinker; allocate a dummy object for API shape. */
+	return kmem_zalloc(sizeof(struct shrinker), KM_NOSLEEP);
+}
+
+static inline void
+shrinker_register(struct shrinker *shrinker)
+{
+	(void)shrinker;
+}
+
+static inline void
+shrinker_free(struct shrinker *shrinker)
+{
+	if (shrinker != NULL)
+		kmem_free(shrinker, sizeof(*shrinker));
+}
+
 static inline bool
 current_is_kswapd(void)
 {
-	return curlwp == uvm.pagedaemon_lwp;
+	return uvm_lwp_is_pagedaemon(curlwp);
 }
 
 static inline size_t

@@ -53,6 +53,12 @@ usleep_range(unsigned long minimum, unsigned long maximum __unused)
 }
 
 static inline void
+usleep_range_state(unsigned long minimum, unsigned long maximum, unsigned int state __unused)
+{
+	usleep_range(minimum, maximum);
+}
+
+static inline void
 mdelay(unsigned int msec)
 {
 
@@ -71,6 +77,17 @@ msleep(unsigned int msec)
 		mdelay(msec);
 	else
 		(void)kpause("lnxmslep", false, mstohz(msec), NULL);
+}
+
+static inline void
+fsleep(unsigned long usecs)
+{
+	if (usecs <= 10)
+		udelay(usecs);
+	else if (usecs < 20000UL)
+		usleep_range(usecs, usecs);
+	else
+		msleep((usecs + 999UL) / 1000UL);
 }
 
 static inline void

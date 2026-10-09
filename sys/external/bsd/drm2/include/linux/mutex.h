@@ -141,4 +141,17 @@ mutex_trylock_recursive(struct mutex *mutex)
 		return MUTEX_TRYLOCK_FAILED;
 }
 
+/*
+ * Static mutex definition.  Constructor runs at module load so the
+ * underlying kmutex is initialized before use.
+ */
+#define	DEFINE_MUTEX(name)						      \
+	struct mutex name;						      \
+	static void __CONCAT(__linux_mutex_ctor_, name)(void)		      \
+	    __attribute__((__constructor__, __used__));			      \
+	static void __CONCAT(__linux_mutex_ctor_, name)(void)		      \
+	{								      \
+		linux_mutex_init(&name);				      \
+	}
+
 #endif  /* _LINUX_MUTEX_H_ */

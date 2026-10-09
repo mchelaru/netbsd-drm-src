@@ -67,4 +67,20 @@ void io_mapping_unmap(struct io_mapping *, void *, bus_size_t);
 void *io_mapping_map_atomic_wc(struct io_mapping *, bus_addr_t);
 void io_mapping_unmap_atomic(struct io_mapping *, void *);
 
+static inline void *
+io_mapping_map_local_wc(struct io_mapping *mapping, bus_addr_t offset)
+{
+	return io_mapping_map_atomic_wc(mapping, offset);
+}
+
+static inline void
+io_mapping_unmap_local(void *vaddr)
+{
+	/*
+	 * Linux drops the mapping pointer; NetBSD's atomic unmap needs
+	 * it.  Without a side table we cannot recover diom; no-op stub.
+	 */
+	(void)vaddr;
+}
+
 #endif  /* _LINUX_IO_MAPPING_H_ */

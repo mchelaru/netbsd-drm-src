@@ -79,4 +79,16 @@ bool hrtimer_active(struct hrtimer *);
 uint64_t hrtimer_forward(struct hrtimer *, ktime_t, ktime_t);
 uint64_t hrtimer_forward_now(struct hrtimer *, ktime_t);
 
+static inline int
+hrtimer_try_to_cancel(struct hrtimer *timer)
+{
+	return hrtimer_cancel(timer);
+}
+
+static inline ktime_t
+hrtimer_get_expires(const struct hrtimer *timer)
+{
+	return timer->hrt_expires;
+}
+
 #endif  /* _LINUX_HRTIMER_H_ */

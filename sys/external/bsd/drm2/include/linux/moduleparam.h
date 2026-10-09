@@ -46,6 +46,10 @@ struct linux_module_param_info {
 #define MTYPE_bool	1
 #define MTYPE_charp	2
 #define MTYPE_uint	3
+#define MTYPE_ulong	4
+#define MTYPE_ullong	4	/* NetBSD: treat as ulong (64-bit on LP64) */
+#define MTYPE_hexint	3	/* NetBSD: same storage as uint */
+#define MTYPE_bint	0	/* NetBSD: bool-as-int param, same as int */
 
 /*
  * In case of accidental cpp expansion, break glass to raise alarm and

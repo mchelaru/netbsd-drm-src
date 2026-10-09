@@ -83,4 +83,23 @@ int dma_map_sg_attrs(bus_dma_tag_t, struct scatterlist *, int, int, int);
 void dma_unmap_sg(bus_dma_tag_t, struct scatterlist *, int, int);
 void dma_unmap_sg_attrs(bus_dma_tag_t, struct scatterlist *, int, int, int);
 
+static inline struct scatterlist *
+sg_next(struct scatterlist *sg)
+{
+	(void)sg;
+	/* NetBSD sg_table is not a Linux-style chain; no next segment. */
+	return NULL;
+}
+
+/*
+ * Linux iterates a chain; NetBSD packs segments in sgl[].  Only the first
+ * element is addressable via the flexible sgl[1] member without casting.
+ */
+#define	for_each_sg(sglist, sg, nr, __i)				\
+	for ((__i) = 0, (sg) = (sglist); (__i) < (nr);			\
+	    (__i)++, (sg) = ((__i) < (nr)) ? &(sglist)[__i] : NULL)
+
+#define	for_each_sgtable_sg(sgt, sg, i)					\
+	for_each_sg((sgt)->sgl, sg, (sgt)->nents, i)
+
 #endif	/* _LINUX_SCATTERLIST_H_ */

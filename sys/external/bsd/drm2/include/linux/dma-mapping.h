@@ -38,6 +38,9 @@
 #include <machine/limits.h>
 
 #include <linux/types.h>
+#include <linux/gfp.h>
+#include <linux/mm_types.h>
+#include <asm/page.h>
 
 enum dma_data_direction {
 	DMA_NONE		= 0,
@@ -54,6 +57,7 @@ enum dma_data_direction {
 enum {
 	DMA_ATTR_NO_WARN	= __BIT(0),
 	DMA_ATTR_SKIP_CPU_SYNC	= __BIT(1),
+	DMA_ATTR_FORCE_CONTIGUOUS = __BIT(2),
 };
 
 static inline uintmax_t
@@ -70,6 +74,102 @@ dma_addressing_limited(device_t dev)
 {
 
 	return false;
+}
+
+static inline void *
+dma_alloc_attrs(device_t dev, size_t size, dma_addr_t *dma_handle, gfp_t gfp,
+    unsigned long attrs)
+{
+	(void)dev;
+	(void)size;
+	(void)dma_handle;
+	(void)gfp;
+	(void)attrs;
+	return NULL;
+}
+
+static inline void
+dma_free_attrs(device_t dev, size_t size, void *cpu_addr, dma_addr_t dma_handle,
+    unsigned long attrs)
+{
+	(void)dev;
+	(void)size;
+	(void)cpu_addr;
+	(void)dma_handle;
+	(void)attrs;
+}
+
+static inline dma_addr_t
+dma_map_page(device_t dev, struct page *page, size_t offset, size_t size,
+    int dir)
+{
+	(void)dev;
+	(void)size;
+	(void)dir;
+	/* Identity map: amdgpu GART wants the CPU physical address. */
+	return (dma_addr_t)page_to_phys(page) + offset;
+}
+
+static inline void
+dma_unmap_page(device_t dev, dma_addr_t addr, size_t size, int dir)
+{
+	(void)dev;
+	(void)addr;
+	(void)size;
+	(void)dir;
+}
+
+static inline int
+dma_mapping_error(device_t dev, dma_addr_t addr)
+{
+	(void)dev;
+	(void)addr;
+	return 0;
+}
+
+static inline int
+dma_set_mask(device_t dev, uint64_t mask)
+{
+	(void)dev;
+	(void)mask;
+	return 0;
+}
+
+static inline int
+dma_set_coherent_mask(device_t dev, uint64_t mask)
+{
+	(void)dev;
+	(void)mask;
+	return 0;
+}
+
+static inline int
+dma_set_mask_and_coherent(device_t dev, uint64_t mask)
+{
+	int rc = dma_set_mask(dev, mask);
+
+	if (rc == 0)
+		dma_set_coherent_mask(dev, mask);
+	return rc;
+}
+
+static inline void *
+dma_alloc_coherent(device_t dev, size_t size, dma_addr_t *dma_handle, gfp_t gfp)
+{
+	(void)dev;
+	(void)size;
+	(void)dma_handle;
+	(void)gfp;
+	return NULL;
+}
+
+static inline void
+dma_free_coherent(device_t dev, size_t size, void *cpu_addr, dma_addr_t dma_handle)
+{
+	(void)dev;
+	(void)size;
+	(void)cpu_addr;
+	(void)dma_handle;
 }
 
 #endif  /* _LINUX_DMA_MAPPING_H_ */

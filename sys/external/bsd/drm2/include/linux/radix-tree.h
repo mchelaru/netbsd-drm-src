@@ -76,4 +76,45 @@ void	radix_tree_iter_delete(struct radix_tree_root *,
 		(N) || ((N) = radix_tree_next_chunk((T), (I), 0));	      \
 		(N) = radix_tree_next_slot((N), (I), 0))
 
+static inline int
+radix_tree_tagged(const struct radix_tree_root *root, unsigned int tag)
+{
+	(void)root;
+	(void)tag;
+	return 0;
+}
+
+static inline void *
+radix_tree_tag_set(struct radix_tree_root *root, unsigned long index,
+		   unsigned int tag)
+{
+	(void)root;
+	(void)index;
+	(void)tag;
+	return NULL;
+}
+
+static inline void *
+radix_tree_tag_clear(struct radix_tree_root *root, unsigned long index,
+		     unsigned int tag)
+{
+	(void)root;
+	(void)index;
+	(void)tag;
+	return NULL;
+}
+
+static inline unsigned int
+radix_tree_gang_lookup_tag(const struct radix_tree_root *root, void **results,
+			   unsigned long first_index, unsigned int max_items,
+			   unsigned int tag)
+{
+	(void)root;
+	(void)results;
+	(void)first_index;
+	(void)max_items;
+	(void)tag;
+	return 0;
+}
+
 #endif  /* _LINUX_RADIX_TREE_H_ */

@@ -46,4 +46,8 @@ struct amdgpufb_attach_args {
 	uint32_t				afa_fb_linebytes;
 };
 
+#ifdef __NetBSD__
+void	amdgpu_fbdev_lastclose(struct drm_device *);
+#endif
+
 #endif	/* _AMDGPU_AMDGPUFB_H_ */

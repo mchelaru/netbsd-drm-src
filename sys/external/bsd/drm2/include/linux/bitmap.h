@@ -267,4 +267,40 @@ bitmap_free(unsigned long *bitmap)
 	kfree(bitmap);
 }
 
+/*
+ * bitmap_fill(bitmap, nbits)
+ *
+ *	Set all bits at 0 .. nbits-1 to 1 (and any trailing bits in the
+ *	last word, matching Linux bitmap_fill).
+ */
+static inline void
+bitmap_fill(unsigned long *bitmap, size_t nbits)
+{
+	const size_t bpl = NBBY * sizeof(*bitmap);
+	size_t n = howmany(nbits, bpl);
+
+	memset(bitmap, 0xff, n * sizeof(*bitmap));
+}
+
+/*
+ * bitmap_to_arr32(buf, bitmap, nbits)
+ *
+ *	Copy the low nbits of bitmap into a host-endian u32 array.
+ */
+static inline void
+bitmap_to_arr32(uint32_t *buf, const unsigned long *bitmap, size_t nbits)
+{
+	const size_t bpl = NBBY * sizeof(*bitmap);
+	size_t n = howmany(nbits, 32);
+	size_t i;
+
+	for (i = 0; i < n; i++) {
+		const size_t bit = i * 32;
+
+		buf[i] = (uint32_t)(bitmap[bit / bpl] >> (bit % bpl));
+	}
+	if (nbits % 32)
+		buf[n - 1] &= (1U << (nbits % 32)) - 1U;
+}
+
 #endif  /* _LINUX_BITMAP_H_ */

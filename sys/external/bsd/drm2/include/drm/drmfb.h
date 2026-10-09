@@ -33,8 +33,11 @@
 #define	_DRM_DRMFB_H_
 
 #include <sys/device_if.h>
+#include <sys/types.h>
 
 #include <dev/wsfb/genfbvar.h>
+
+#include <linux/workqueue.h>
 
 struct drm_device;
 struct drm_fb_helper;
@@ -70,6 +73,20 @@ struct drmfb_params {
 	/* XXX Kludge!  */
 	bool		(*dp_is_vga_console)(struct drm_device *);
 	void		(*dp_disable_vga)(struct drm_device *);
+
+	/*
+	 * Optional Phoenix/APU gate: return false to skip fbdev restore.
+	 * cold_deferred is true for the post-attach workqueue path.
+	 * NULL means restore is always allowed (default for non-amdgpu).
+	 */
+	bool		(*dp_fbdev_restore_ok)(struct drmfb_softc *,
+			    bool cold_deferred);
+
+	/*
+	 * Optional: after a successful fbdev restore, rebind console drawing
+	 * from bootloader GOP to the KMS framebuffer (GTT).
+	 */
+	void		(*dp_fbdev_restored)(struct drmfb_softc *);
 };
 
 struct drmfb_attach_args {
@@ -85,6 +102,8 @@ struct drmfb_attach_args {
 struct drmfb_softc {
 	struct genfb_softc		sc_genfb; /* XXX Must be first. */
 	struct drmfb_attach_args	sc_da;
+	struct work_struct		sc_restore_work;
+	bool				sc_cold;
 };
 
 int	drmfb_attach(struct drmfb_softc *, const struct drmfb_attach_args *);

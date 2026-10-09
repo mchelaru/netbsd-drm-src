@@ -137,4 +137,24 @@ struct sg_table *
 void	dma_buf_unmap_attachment(struct dma_buf_attachment *,
 	    struct sg_table *, enum dma_data_direction);
 
+/* XXX amdgpu: pin/unpin/move_notify not implemented on NetBSD. */
+static inline int
+dma_buf_pin(struct dma_buf_attachment *attach)
+{
+	(void)attach;
+	return 0;
+}
+
+static inline void
+dma_buf_unpin(struct dma_buf_attachment *attach)
+{
+	(void)attach;
+}
+
+static inline void
+dma_buf_move_notify(struct dma_buf *dmabuf)
+{
+	(void)dmabuf;
+}
+
 #endif  /* _LINUX_DMA_BUF_H_ */

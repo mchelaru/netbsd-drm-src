@@ -94,6 +94,11 @@ CTASSERT(PCI_CLASS_DISPLAY_OTHER == 0x0380);
 	((PCI_CLASS_DISPLAY << 8) | PCI_SUBCLASS_DISPLAY_3D)
 CTASSERT(PCI_CLASS_DISPLAY_3D == 0x0302);
 
+/* Linux pci_ids.h: processing accelerators (e.g. compute-class AMD). */
+#ifndef PCI_CLASS_ACCELERATOR_PROCESSING
+#define	PCI_CLASS_ACCELERATOR_PROCESSING	0x1200
+#endif
+
 #define	PCI_CLASS_BRIDGE_ISA						\
 	((PCI_CLASS_BRIDGE << 8) | PCI_SUBCLASS_BRIDGE_ISA)
 CTASSERT(PCI_CLASS_BRIDGE_ISA == 0x0601);
@@ -135,6 +140,7 @@ CTASSERT(PCI_CLASS_BRIDGE_ISA == 0x0601);
 #define  PCI_EXP_LNKCTL_HAWD		PCIE_LCSR_HAWD
 #define PCI_EXP_DEVSTA			(PCIE_DCSR + 2)
 #define  PCI_EXP_DEVSTA_TRPND		(PCIE_DCSR_TRANSACTION_PND >> 16)
+#define PCI_EXP_LNKSTA			(PCIE_LCSR + 2)
 #define PCI_EXP_LNKCTL2			PCIE_LCAP2
 #define  PCI_EXP_LNKCTL2_ENTER_COMP	PCIE_LCSR2_ENT_COMPL
 #define  PCI_EXP_LNKCTL2_TX_MARGIN	PCIE_LCSR2_TX_MARGIN
@@ -146,6 +152,19 @@ CTASSERT(PCI_CLASS_BRIDGE_ISA == 0x0601);
 #define  PCI_EXP_LNKCAP_CLKPM		PCIE_LCAP_CLOCK_PM
 #define PCI_EXP_DEVCAP2_ATOMIC_COMP32	PCIE_DCAP2_32ATOM
 #define PCI_EXP_DEVCAP2_ATOMIC_COMP64	PCIE_DCAP2_64ATOM
+
+#ifndef PCI_EXT_CAP_ID_ERR
+#define PCI_EXT_CAP_ID_ERR		PCI_EXTCAP_AER
+#endif
+#ifndef PCI_ERR_COR_STATUS
+#define PCI_ERR_COR_STATUS		PCI_AER_COR_STATUS
+#endif
+#ifndef PCI_ERR_UNCOR_STATUS
+#define PCI_ERR_UNCOR_STATUS		PCI_AER_UC_STATUS
+#endif
+#ifndef PCI_PRIMARY_BUS
+#define PCI_PRIMARY_BUS			PCI_BRIDGE_BUS_REG
+#endif
 
 
 typedef int pci_power_t;
@@ -197,6 +216,7 @@ struct pci_dev {
 	uint32_t		class;
 	bool			msi_enabled;
 	bool			no_64bit_msi;
+	uint8_t			msix_cap;	/* XXX amdgpu: MSI-X cap offset */
 };
 
 enum pci_bus_speed {
@@ -333,6 +353,31 @@ int		pcie_capability_read_word(struct pci_dev *, int, uint16_t *);
 int		pcie_capability_write_dword(struct pci_dev *, int, uint32_t);
 int		pcie_capability_write_word(struct pci_dev *, int, uint16_t);
 
+static inline int
+pcie_capability_set_word(struct pci_dev *dev, int pos, uint16_t val)
+{
+	uint16_t v;
+	int r;
+
+	r = pcie_capability_read_word(dev, pos, &v);
+	if (r)
+		return r;
+	return pcie_capability_write_word(dev, pos, v | val);
+}
+
+static inline int
+pcie_capability_clear_and_set_word(struct pci_dev *dev, int pos,
+    uint16_t clear, uint16_t set)
+{
+	uint16_t v;
+	int r;
+
+	r = pcie_capability_read_word(dev, pos, &v);
+	if (r)
+		return r;
+	return pcie_capability_write_word(dev, pos, (v & ~clear) | set);
+}
+
 int		pci_bus_read_config_dword(struct pci_bus *, unsigned, int,
 		    uint32_t *);
 int		pci_bus_read_config_word(struct pci_bus *, unsigned, int,
@@ -350,6 +395,55 @@ int		pci_enable_msi(struct pci_dev *);
 void		pci_disable_msi(struct pci_dev *);
 void		pci_set_master(struct pci_dev *);
 void		pci_clear_master(struct pci_dev *);
+
+/* XXX amdgpu: Linux MSI/MSI-X vector API stubs */
+#ifndef PCI_IRQ_INTX
+#define	PCI_IRQ_INTX		(1 << 0)
+#endif
+#ifndef PCI_IRQ_MSI
+#define	PCI_IRQ_MSI		(1 << 1)
+#endif
+#ifndef PCI_IRQ_MSIX
+#define	PCI_IRQ_MSIX		(1 << 2)
+#endif
+#ifndef PCI_IRQ_ALL_TYPES
+#define	PCI_IRQ_ALL_TYPES	(PCI_IRQ_INTX | PCI_IRQ_MSI | PCI_IRQ_MSIX)
+#endif
+#ifndef PCI_MSIX_FLAGS
+#define	PCI_MSIX_FLAGS		2
+#endif
+#ifndef PCI_MSIX_FLAGS_ENABLE
+#define	PCI_MSIX_FLAGS_ENABLE	0x8000
+#endif
+
+static inline int
+pci_alloc_irq_vectors(struct pci_dev *dev, unsigned int min_vecs,
+    unsigned int max_vecs, unsigned int flags)
+{
+	(void)min_vecs;
+	(void)max_vecs;
+	/* Prefer MSI; fall back to INTx so drm_pci_request_irq can attach. */
+	if ((flags & (PCI_IRQ_MSI | PCI_IRQ_MSIX)) != 0 &&
+	    pci_enable_msi(dev) == 0)
+		return 1;
+	if ((flags & PCI_IRQ_INTX) != 0)
+		return 1;
+	return -ENOSYS;
+}
+
+static inline void
+pci_free_irq_vectors(struct pci_dev *dev)
+{
+	pci_disable_msi(dev);
+}
+
+static inline int
+pci_irq_vector(struct pci_dev *dev, unsigned int nr)
+{
+	(void)dev;
+	(void)nr;
+	return 0;
+}
 
 int		pcie_get_readrq(struct pci_dev *);
 int		pcie_set_readrq(struct pci_dev *, int);
@@ -406,11 +500,40 @@ dev_is_pci(struct device *dev)
 	return parent && device_is_a(parent, "pci");
 }
 
+/* Linux pci_is_enabled(9): true if linux_pci_enable_device has been balanced. */
+static inline bool
+pci_is_enabled(struct pci_dev *pdev)
+{
+
+	return pdev != NULL && pdev->pd_enablecnt > 0;
+}
+
 static inline int
 pci_enable_atomic_ops_to_root(struct pci_dev *dev, uint32_t cap_mask)
 {
 
 	return -EINVAL;
 }
+
+/*
+ * PCI error recovery types (CONFIG_PCIEAER stubs).
+ */
+typedef unsigned int pci_channel_state_t;
+typedef unsigned int pci_ers_result_t;
+
+enum {
+	pci_channel_io_normal = 1,
+	pci_channel_io_frozen = 2,
+	pci_channel_io_perm_failure = 3,
+};
+
+enum {
+	PCI_ERS_RESULT_NONE = 1,
+	PCI_ERS_RESULT_CAN_RECOVER = 2,
+	PCI_ERS_RESULT_NEED_RESET = 3,
+	PCI_ERS_RESULT_DISCONNECT = 4,
+	PCI_ERS_RESULT_RECOVERED = 5,
+	PCI_ERS_RESULT_NO_AER_DRIVER = 6,
+};
 
 #endif  /* _LINUX_PCI_H_ */

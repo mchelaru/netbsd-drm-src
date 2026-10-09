@@ -62,6 +62,45 @@ fdput(struct fd fd)
 	fd_putfile(fd.fd_number);
 }
 
+static inline bool
+fd_empty(struct fd f)
+{
+
+	return f.file == NULL;
+}
+
+static inline struct file *
+fd_file(struct fd f)
+{
+
+	return f.file;
+}
+
+/*
+ * Approximate Linux CLASS(fd, var)(fdnum) without requiring cleanup.h.
+ * Expands to: struct fd var = fdget(fdnum);
+ * Callers that return early must still fdput(var) on NetBSD (no __cleanup).
+ */
+typedef struct fd class_fd_t;
+static inline struct fd
+class_fd_constructor(int fdnum)
+{
+
+	return fdget(fdnum);
+}
+static inline void
+class_fd_destructor(struct fd *p)
+{
+
+	fdput(*p);
+}
+
+#ifndef CLASS
+#define	CLASS(_name, var)						\
+	class_##_name##_t var __attribute__((__cleanup__(class_##_name##_destructor))) = \
+	    class_##_name##_constructor
+#endif
+
 /* fget translates; fput(fp) doesn't because we have fd_putfile(fd).  */
 static inline struct file *
 fget(int fd)
@@ -73,6 +112,13 @@ static inline void
 fd_install(int fd, struct file *fp)
 {
 	fd_affix(curproc, fp, fd);
+}
+
+static inline void
+fput(struct file *fp)
+{
+	(void)fp;
+	/* XXX: NetBSD callers use fd_putfile(fd); no filp refcount API. */
 }
 
 #endif  /* _LINUX_FILE_H_ */

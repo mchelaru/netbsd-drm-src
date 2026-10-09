@@ -251,4 +251,11 @@ _kfifo_in(struct kfifo_meta *meta, void *buf, const void *ptr, size_t size)
 	return copied;
 }
 
+/* Single-element helpers used by amdgpu RAS poison FIFO. */
+#define	kfifo_put(FIFO, VAL)						      \
+	kfifo_in((FIFO), &(VAL), sizeof(VAL))
+
+#define	kfifo_get(FIFO, VAL)						      \
+	kfifo_out((FIFO), (VAL), sizeof(*(VAL)))
+
 #endif	/* _LINUX_KFIFO_H_ */

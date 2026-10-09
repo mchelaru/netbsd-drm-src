@@ -133,4 +133,18 @@ bool	drm_vma_node_is_allowed(struct drm_vma_offset_node *,
 int	drm_vma_node_verify_access(struct drm_vma_offset_node *,
 	    struct drm_file *);
 
+/*
+ * Upstream name is drm_vma_node_reset; NetBSD historically used
+ * drm_vma_node_init.  Provide the upstream alias for newer TTM.
+ */
+#define	drm_vma_node_reset	drm_vma_node_init
+
+static inline void
+drm_vma_node_unmap(struct drm_vma_offset_node *node, void *file_mapping)
+{
+	(void)node;
+	(void)file_mapping;
+	/* XXX: unmap_mapping_range not implemented on NetBSD */
+}
+
 #endif	/* _DRM_DRM_VMA_MANAGER_H_ */

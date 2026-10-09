@@ -50,6 +50,19 @@ struct i2c_msg;
 #define	I2C_NAME_SIZE	20
 
 /*
+ * struct i2c_adapter_quirks: optional transfer size limits (Linux).
+ * Unused on NetBSD; left for source compatibility.
+ */
+struct i2c_adapter_quirks {
+	uint64_t flags;
+	int max_num_msgs;
+	uint16_t max_write_len;
+	uint16_t max_read_len;
+	uint16_t max_comb_1st_msg_len;
+	uint16_t max_comb_2nd_msg_len;
+};
+
+/*
  * I2C_M_*: i2c_msg flags
  */
 #define	I2C_M_RD		0x01 /* xfer is read, not write */
@@ -62,6 +75,14 @@ struct i2c_msg;
  */
 #define	I2C_CLASS_DDC	0x01
 #define	I2C_CLASS_SPD	0x02
+#define	I2C_CLASS_HWMON	0x04
+
+/*
+ * I2C_AQ_*: i2c_adapter_quirks.flags bits (source compatibility only).
+ */
+#define	I2C_AQ_COMB		0x01
+#define	I2C_AQ_COMB_SAME_ADDR	0x02
+#define	I2C_AQ_NO_ZERO_LEN	0x04
 
 /*
  * I2C_FUNC_*: i2c_adapter functionality bits
@@ -92,6 +113,7 @@ struct i2c_adapter {
 	const struct i2c_algorithm	*algo;
 	void				*algo_data;
 	const struct i2c_lock_operations *lock_ops;
+	const struct i2c_adapter_quirks	*quirks;
 	int				retries;
 	struct module			*owner;
 	unsigned int			class; /* I2C_CLASS_* */

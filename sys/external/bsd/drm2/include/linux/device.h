@@ -53,7 +53,11 @@
 		aprint_error("error: " FMT, ##__VA_ARGS__);		      \
 } while (0)
 
+#define	dev_emerg	dev_err	/* XXX severity alias */
 #define	dev_err_once	dev_err	/* XXX rate-limit */
+#define	dev_dbg_once	dev_dbg	/* XXX rate-limit */
+
+#define	dev_printk(LEVEL, DEV, FMT, ...)	dev_info((DEV), FMT, ##__VA_ARGS__)
 
 #define	dev_warn(DEV, FMT, ...)	do {					      \
 	if (DEV)							      \
@@ -62,6 +66,10 @@
 		aprint_normal("warn: " FMT, ##__VA_ARGS__);		      \
 } while (0)
 #define	dev_WARN	dev_warn
+#define	dev_WARN_ONCE(DEV, COND, FMT, ...)	do {			      \
+	if (COND)							      \
+		dev_warn((DEV), FMT, ##__VA_ARGS__);			      \
+} while (/*CONSTCOND*/0)
 
 #define	dev_notice(DEV, FMT, ...)	do {				      \
 	if (DEV)							      \
@@ -77,6 +85,8 @@
 		aprint_normal(FMT, ##__VA_ARGS__);			      \
 } while (0)
 
+#define	dev_info_once	dev_info	/* XXX rate-limit */
+
 #define	dev_dbg(DEV, FMT, ...)	do {					      \
 	if (DEV)							      \
 		aprint_debug_dev((DEV), "debug: " FMT, ##__VA_ARGS__);	      \
@@ -90,10 +100,24 @@
 #define	DPM_FLAG_NEVER_SKIP	0
 
 #define	dev_warn_ratelimited	dev_warn
+#define	dev_err_ratelimited	dev_err
+#define	dev_dbg_ratelimited	dev_dbg
+#define	dev_warn_once		dev_warn
+#define	dev_err_once		dev_err
 
 static inline void
 dev_pm_set_driver_flags(struct device *dev, uint32_t flags)
 {
+	(void)dev;
+	(void)flags;
+}
+
+/* XXX amdgpu: Linux driver-private data; unused on NetBSD. */
+static inline void *
+dev_get_drvdata(const struct device *dev)
+{
+	(void)dev;
+	return NULL;
 }
 
 #endif  /* _LINUX_DEVICE_H_ */

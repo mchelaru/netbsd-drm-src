@@ -32,4 +32,49 @@
 #ifndef _LINUX_KOBJECT_H_
 #define _LINUX_KOBJECT_H_
 
+#include <sys/types.h>
+#include <sys/systm.h>
+
+#include <linux/list.h>
+
+/*
+ * Minimal kobject stub so structures can embed struct kobject.
+ * sysfs registration is a no-op on NetBSD.
+ */
+struct kobject {
+	const char		*name;
+	struct list_head	entry;
+	struct kobject		*parent;
+	unsigned int		state_initialized:1;
+};
+
+static inline void
+kobject_init(struct kobject *kobj, void *ktype)
+{
+	(void)ktype;
+	memset(kobj, 0, sizeof(*kobj));
+	kobj->state_initialized = 1;
+}
+
+static inline int
+kobject_add(struct kobject *kobj, struct kobject *parent, const char *fmt, ...)
+{
+	(void)kobj;
+	(void)parent;
+	(void)fmt;
+	return 0;
+}
+
+static inline void
+kobject_put(struct kobject *kobj)
+{
+	(void)kobj;
+}
+
+static inline void
+kobject_del(struct kobject *kobj)
+{
+	(void)kobj;
+}
+
 #endif  /* _LINUX_KOBJECT_H_ */

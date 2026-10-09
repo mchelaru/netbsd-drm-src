@@ -40,6 +40,7 @@
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/mm_types.h>
+#include <linux/string.h>
 
 /* XXX Make the nm output a little more greppable...  */
 #define	kmap(p)			linux_kmap(p)
@@ -58,5 +59,36 @@ void	kunmap_atomic(void *);
 
 void *	kmap(struct page *);
 void	kunmap(struct page *);
+
+static inline void *
+kmap_local_page_prot(struct page *page, pgprot_t prot)
+{
+	(void)prot;
+	return kmap_atomic(page);
+}
+
+static inline void *
+kmap_local_page(struct page *page)
+{
+	return kmap_atomic(page);
+}
+
+static inline void
+kunmap_local(void *addr)
+{
+	kunmap_atomic(addr);
+}
+
+static inline void
+copy_highpage(struct page *to, struct page *from)
+{
+	void *vto, *vfrom;
+
+	vto = kmap_atomic(to);
+	vfrom = kmap_atomic(from);
+	memcpy(vto, vfrom, PAGE_SIZE);
+	kunmap_atomic(vfrom);
+	kunmap_atomic(vto);
+}
 
 #endif  /* _LINUX_HIGHMEM_H_ */

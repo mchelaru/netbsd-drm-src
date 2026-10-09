@@ -145,6 +145,13 @@ ktime_get_boottime(void)
 	return ktime_get();
 }
 
+static inline uint64_t
+ktime_get_boottime_ns(void)
+{
+
+	return ktime_to_ns(ktime_get_boottime());
+}
+
 static inline ktime_t
 ktime_get_raw(void)
 {
@@ -168,6 +175,12 @@ static inline uint64_t
 ktime_get_mono_fast_ns(void)
 {
 	return ktime_get_raw_ns();
+}
+
+static inline ktime_t
+ktime_set(const s64 secs, const unsigned long nsecs)
+{
+	return ns_to_ktime(secs * NSEC_PER_SEC + (s64)nsecs);
 }
 
 static inline ktime_t

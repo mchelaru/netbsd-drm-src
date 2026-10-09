@@ -76,4 +76,11 @@ struct dmi_system_id {
 int dmi_check_system(const struct dmi_system_id *list);
 bool dmi_match(enum dmi_field, const char[]);
 
+static inline const char *
+dmi_get_system_info(int field)
+{
+	(void)field;
+	return (const char *)0;
+}
+
 #endif  /* _LINUX_DMI_H_ */
