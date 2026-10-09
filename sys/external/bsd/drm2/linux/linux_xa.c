@@ -107,16 +107,39 @@ xa_destroy(struct xarray *xa)
 	mutex_destroy(&xa->xa_lock);
 }
 
+/*
+ * Linux xa_load() is RCU-style and may run while xa_lock is already held
+ * (amdgpu_vm_update_fault_cache under xa_lock_irqsave).  NetBSD uses a
+ * kmutex so skip recursive mutex_enter or softints stick until panic.
+ * Of course that this would be fixed once we switch to pserialize but
+ * until then clown around.
+ */
+static bool
+xa_lock_enter(struct xarray *xa)
+{
+	if (mutex_owned(&xa->xa_lock))
+		return false;
+	mutex_enter(&xa->xa_lock);
+	return true;
+}
+
+static void
+xa_lock_exit(struct xarray *xa, bool took)
+{
+	if (took)
+		mutex_exit(&xa->xa_lock);
+}
+
 void *
 xa_load(struct xarray *xa, unsigned long key)
 {
 	const uint64_t key64 = key;
 	struct node *n;
+	bool took;
 
-	/* XXX pserialize */
-	mutex_enter(&xa->xa_lock);
+	took = xa_lock_enter(xa);
 	n = rb_tree_find_node(&xa->xa_tree, &key64);
-	mutex_exit(&xa->xa_lock);
+	xa_lock_exit(xa, took);
 
 	return n ? n->n_datum : NULL;
 }
@@ -135,14 +158,17 @@ xa_store(struct xarray *xa, unsigned long key, void *datum, gfp_t gfp)
 	n->n_key = key;
 	n->n_datum = datum;
 
-	mutex_enter(&xa->xa_lock);
-	collision = rb_tree_insert_node(&xa->xa_tree, n);
-	if (collision != n) {
-		rb_tree_remove_node(&xa->xa_tree, n);
-		recollision = rb_tree_insert_node(&xa->xa_tree, n);
-		KASSERT(recollision == n);
+	{
+		bool took = xa_lock_enter(xa);
+
+		collision = rb_tree_insert_node(&xa->xa_tree, n);
+		if (collision != n) {
+			rb_tree_remove_node(&xa->xa_tree, n);
+			recollision = rb_tree_insert_node(&xa->xa_tree, n);
+			KASSERT(recollision == n);
+		}
+		xa_lock_exit(xa, took);
 	}
-	mutex_exit(&xa->xa_lock);
 
 	if (collision != n) {
 		datum = collision->n_datum;
@@ -167,26 +193,31 @@ xa_alloc(struct xarray *xa, uint32_t *idp, void *datum, struct xa_limit limit,
 		return -ENOMEM;
 	n->n_datum = datum;
 
-	mutex_enter(&xa->xa_lock);
-	while ((n1 = rb_tree_find_node_geq(&xa->xa_tree, &key64)) != NULL &&
-	    n1->n_key == key64) {
-		if (key64 == limit.max) {
-			error = -EBUSY;
-			goto out;
-		}
-		KASSERT(key64 < UINT32_MAX);
-		key64++;
-	}
-	/* Found a hole -- insert in it.  */
-	KASSERT(n1 == NULL || n1->n_key > key64);
-	n->n_key = key64;
-	collision = rb_tree_insert_node(&xa->xa_tree, n);
-	KASSERT(collision == n);
-	error = 0;
-out:	mutex_exit(&xa->xa_lock);
+	{
+		bool took = xa_lock_enter(xa);
 
-	if (error)
+		while ((n1 = rb_tree_find_node_geq(&xa->xa_tree, &key64)) !=
+		    NULL && n1->n_key == key64) {
+			if (key64 == limit.max) {
+				error = -EBUSY;
+				goto out;
+			}
+			KASSERT(key64 < UINT32_MAX);
+			key64++;
+		}
+		/* Found a hole -- insert in it.  */
+		KASSERT(n1 == NULL || n1->n_key > key64);
+		n->n_key = key64;
+		collision = rb_tree_insert_node(&xa->xa_tree, n);
+		KASSERT(collision == n);
+		error = 0;
+out:		xa_lock_exit(xa, took);
+	}
+
+	if (error) {
+		kmem_free(n, sizeof(*n));
 		return error;
+	}
 	*idp = key64;
 	return 0;
 }
@@ -200,9 +231,12 @@ xa_find(struct xarray *xa, unsigned long *startp, unsigned long max,
 
 	KASSERT(tagmask == -1);	/* not yet supported */
 
-	mutex_enter(&xa->xa_lock);
-	n = rb_tree_find_node_geq(&xa->xa_tree, &key64);
-	mutex_exit(&xa->xa_lock);
+	{
+		bool took = xa_lock_enter(xa);
+
+		n = rb_tree_find_node_geq(&xa->xa_tree, &key64);
+		xa_lock_exit(xa, took);
+	}
 
 	if (n == NULL || n->n_key > max)
 		return NULL;
@@ -233,11 +267,14 @@ xa_erase(struct xarray *xa, unsigned long key)
 	struct node *n;
 	void *datum = NULL;
 
-	mutex_enter(&xa->xa_lock);
-	n = rb_tree_find_node(&xa->xa_tree, &key64);
-	if (n)
-		rb_tree_remove_node(&xa->xa_tree, n);
-	mutex_exit(&xa->xa_lock);
+	{
+		bool took = xa_lock_enter(xa);
+
+		n = rb_tree_find_node(&xa->xa_tree, &key64);
+		if (n)
+			rb_tree_remove_node(&xa->xa_tree, n);
+		xa_lock_exit(xa, took);
+	}
 
 	if (n) {
 		datum = n->n_datum;
