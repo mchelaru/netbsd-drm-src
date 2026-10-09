@@ -38,6 +38,7 @@ __KERNEL_RCSID(0, "$NetBSD: drm_client.c,v 1.3 2021/12/19 11:07:55 riastradh Exp
 
 #include <drm/drm_client.h>
 #include <drm/drm_drv.h>
+#include <drm/drm_fb_helper.h>
 
 int
 drm_client_init(struct drm_device *dev, struct drm_client_dev *client,
@@ -75,9 +76,19 @@ drm_client_dev_hotplug(struct drm_device *dev)
 {
 }
 
+/*
+ * Linux walks registered DRM clients.  If the driver already has a
+ * lastclose hook (amdgpu restores fbdev + rebinds GOP-GTT there),
+ * drm_lastclose has already run it.  Otherwise fall back to the
+ * generic fb helper restore.
+ */
 void
 drm_client_dev_restore(struct drm_device *dev)
 {
+	if (dev == NULL || dev->fb_helper == NULL ||
+	    (dev->driver != NULL && dev->driver->lastclose != NULL))
+		return;
+	drm_fb_helper_lastclose(dev);
 }
 
 void

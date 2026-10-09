@@ -65,9 +65,14 @@ __KERNEL_RCSID(0, "$NetBSD: drmfb.c,v 1.16 2022/09/01 17:54:47 riastradh Exp $")
 
 #include <dev/wsfb/genfbvar.h>
 
+#include <drm/drm_client.h>
 #include <drm/drm_device.h>
 #include <drm/drm_fb_helper.h>
+#include <drm/drm_modes.h>
+#include <drm/drm_print.h>
 #include <drm/drmfb.h>
+
+#include <linux/workqueue.h>
 
 static int	drmfb_genfb_ioctl(void *, void *, unsigned long, void *, int,
 		    struct lwp *);
@@ -75,6 +80,7 @@ static paddr_t	drmfb_genfb_mmap(void *, void *, off_t, int);
 static int	drmfb_genfb_enable_polling(void *);
 static int	drmfb_genfb_disable_polling(void *);
 static bool	drmfb_genfb_setmode(struct genfb_softc *, int);
+static void	drmfb_restore_work(struct work_struct *);
 
 static const struct genfb_mode_callback drmfb_genfb_mode_callback = {
 	.gmc_setmode = drmfb_genfb_setmode,
@@ -102,6 +108,8 @@ drmfb_attach(struct drmfb_softc *sc, const struct drmfb_attach_args *da)
 	    "drmfb_softc must be first member of device softc");
 
 	sc->sc_da = *da;
+	sc->sc_cold = true;
+	INIT_WORK(&sc->sc_restore_work, drmfb_restore_work);
 
 	prop_dictionary_set_uint32(dict, "width", sizes->surface_width);
 	prop_dictionary_set_uint32(dict, "height", sizes->surface_height);
@@ -168,6 +176,12 @@ drmfb_attach(struct drmfb_softc *sc, const struct drmfb_attach_args *da)
 	error = genfb_attach(&sc->sc_genfb, &genfb_ops);
 	KERNEL_UNLOCK_ONE(NULL);
 	KASSERTMSG(error == 0, "genfb_attach failed, error=%d", error);
+
+	/*
+	 * genfb_attach may have queued a deferred fbdev modeset via
+	 * drmfb_genfb_setmode (cold).  Further setmode calls run synchronously.
+	 */
+	sc->sc_cold = false;
 
 	/* Success!  */
 	return 0;
@@ -274,15 +288,95 @@ drmfb_genfb_disable_polling(void *cookie)
 }
 
 static bool
+drmfb_restore_allowed(struct drmfb_softc *sc, bool cold_deferred)
+{
+	const struct drmfb_params *params = sc->sc_da.da_params;
+
+	if (params != NULL && params->dp_fbdev_restore_ok != NULL)
+		return (*params->dp_fbdev_restore_ok)(sc, cold_deferred);
+	return true;
+}
+
+static int
+drmfb_do_restore(struct drmfb_softc *sc, bool cold_deferred)
+{
+	struct drm_fb_helper *fb_helper = sc->sc_da.da_fb_helper;
+	const struct drmfb_params *params = sc->sc_da.da_params;
+	struct drm_client_dev *client;
+	struct drm_mode_set *mode_set;
+	int ret;
+
+	if (!drmfb_restore_allowed(sc, cold_deferred)) {
+		DRM_INFO("drmfb: %s fbdev restore skipped (%s)\n",
+		    cold_deferred ? "deferred" : "setmode",
+		    cold_deferred ? "keep VBIOS until accelerated" :
+		    "not accelerated yet");
+		return 0;
+	}
+
+	DRM_INFO("drmfb: %s fbdev modeset begin\n",
+	    cold_deferred ? "deferred" : "setmode");
+	if (fb_helper != NULL) {
+		client = &fb_helper->client;
+		drm_client_for_each_modeset(mode_set, client) {
+			DRM_INFO("drmfb: modeset crtc=%d mode=%dx%d@%d fb=%dx%d\n",
+			    mode_set->crtc ? mode_set->crtc->base.id : -1,
+			    mode_set->mode ? mode_set->mode->hdisplay : 0,
+			    mode_set->mode ? mode_set->mode->vdisplay : 0,
+			    mode_set->mode ? drm_mode_vrefresh(mode_set->mode) : 0,
+			    mode_set->fb ? mode_set->fb->width : 0,
+			    mode_set->fb ? mode_set->fb->height : 0);
+		}
+	}
+	ret = drm_fb_helper_restore_fbdev_mode_unlocked(fb_helper);
+	DRM_INFO("drmfb: %s fbdev modeset done ret=%d\n",
+	    cold_deferred ? "deferred" : "setmode", ret);
+
+	if (ret == 0 && params != NULL && params->dp_fbdev_restored != NULL)
+		(*params->dp_fbdev_restored)(sc);
+
+	return ret;
+}
+
+static void
+drmfb_restore_work(struct work_struct *work)
+{
+	struct drmfb_softc *sc = container_of(work, struct drmfb_softc,
+	    sc_restore_work);
+
+	/*
+	 * FIXME: cold deferred fbdev modeset still hangs in DC
+	 * commit after "modeset begin" (partial font/geometry change, no
+	 * init).  Do not attempt KMS takeover while VBIOS owns the panel.
+	 * Post-X VT restore uses the synchronous MODE_EMUL path below.
+	 */
+	(void)sc;
+	DRM_INFO("drmfb: deferred fbdev modeset skipped (keep VBIOS)\n");
+}
+
+static bool
 drmfb_genfb_setmode(struct genfb_softc *genfb, int mode)
 {
 	struct drmfb_softc *sc = container_of(genfb, struct drmfb_softc,
 	    sc_genfb);
-	struct drm_fb_helper *fb_helper = sc->sc_da.da_fb_helper;
 
-	if (mode == WSDISPLAYIO_MODE_EMUL)
-		drm_fb_helper_restore_fbdev_mode_unlocked(fb_helper);
+	if (mode != WSDISPLAYIO_MODE_EMUL)
+		return true;
 
+	/*
+	 * During genfb_attach, never modeset synchronously (and do not
+	 * schedule a cold deferred modeset either - see restore_work).
+	 */
+	if (sc->sc_cold) {
+		schedule_work(&sc->sc_restore_work);
+		return true;
+	}
+
+	/*
+	 * VT switch / KD_TEXT: restore fbdev when the driver allows it
+	 * (amdgpu: only after accelerated mode, i.e. after X modeset).
+	 */
+	(void)drmfb_do_restore(sc, false);
 	return true;
 }
 

@@ -159,3 +159,18 @@ fail1:	kmem_free(fb, sizeof(*fb));
 fail0:	KASSERT(ret);
 	return ERR_PTR(ret);
 }
+
+/*
+ * drm_gem_fb_get_obj(fb, plane)
+ *
+ *	Return the GEM object backing the given framebuffer plane, or
+ *	NULL if the plane index is out of range / unused.
+ */
+struct drm_gem_object *
+drm_gem_fb_get_obj(struct drm_framebuffer *fb, unsigned int plane)
+{
+	if (plane >= fb->format->num_planes)
+		return NULL;
+
+	return fb->obj[plane];
+}
