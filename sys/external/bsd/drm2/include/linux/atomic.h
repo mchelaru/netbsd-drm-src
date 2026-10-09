@@ -508,4 +508,16 @@ atomic_long_cmpxchg(struct atomic_long *a, long expect, long new)
 	return old;
 }
 
+static inline void
+atomic_long_add(long i, struct atomic_long *a)
+{
+	atomic_add_long(&a->al_v, i);
+}
+
+static inline void
+atomic_long_sub(long i, struct atomic_long *a)
+{
+	atomic_add_long(&a->al_v, -i);
+}
+
 #endif  /* _LINUX_ATOMIC_H_ */
