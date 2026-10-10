@@ -368,7 +368,6 @@ drmfb_genfb_setmode(struct genfb_softc *genfb, int mode)
 	 * schedule a cold deferred modeset either - see restore_work).
 	 */
 	if (sc->sc_cold) {
-		schedule_work(&sc->sc_restore_work);
 		return true;
 	}
 
