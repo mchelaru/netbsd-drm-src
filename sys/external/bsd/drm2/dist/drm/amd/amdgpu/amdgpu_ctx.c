@@ -500,10 +500,13 @@ static int amdgpu_ctx_alloc(struct amdgpu_device *adev,
 	if (!ctx)
 		return -ENOMEM;
 
+	/* NetBSD idr_alloc requires a preloaded node; Linux allocates inline. */
+	idr_preload(GFP_KERNEL);
 	mutex_lock(&mgr->lock);
 	r = idr_alloc(&mgr->ctx_handles, ctx, 1, AMDGPU_VM_MAX_NUM_CTX, GFP_KERNEL);
 	if (r < 0) {
 		mutex_unlock(&mgr->lock);
+		idr_preload_end();
 		kfree(ctx);
 		return r;
 	}
@@ -516,6 +519,7 @@ static int amdgpu_ctx_alloc(struct amdgpu_device *adev,
 		kfree(ctx);
 	}
 	mutex_unlock(&mgr->lock);
+	idr_preload_end();
 	return r;
 }
 

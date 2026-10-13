@@ -253,9 +253,11 @@ int amdgpu_bo_list_ioctl(struct drm_device *dev, void *data,
 		if (r)
 			goto error_free;
 
+		idr_preload(GFP_KERNEL);
 		mutex_lock(&fpriv->bo_list_lock);
 		r = idr_alloc(&fpriv->bo_list_handles, list, 1, 0, GFP_KERNEL);
 		mutex_unlock(&fpriv->bo_list_lock);
+		idr_preload_end();
 		if (r < 0) {
 			goto error_put_list;
 		}
