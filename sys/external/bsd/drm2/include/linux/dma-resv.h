@@ -32,6 +32,7 @@
 #ifndef	_LINUX_DMA_RESV_H_
 #define	_LINUX_DMA_RESV_H_
 
+#include <linux/atomic.h>
 #include <linux/dma-fence.h>
 #include <linux/rcupdate.h>
 #include <linux/seqlock.h>
@@ -149,7 +150,13 @@ dma_resv_has_excl_fence(const struct dma_resv *robj)
 
 /*
  * Newer Linux dma_resv API (usage classes + iterators).  Mapped onto the
- * legacy excl/shared fence model for NetBSD; iterators are empty stubs.
+ * legacy excl/shared fence model for NetBSD:
+ *
+ *   fence_excl  -> DMA_RESV_USAGE_KERNEL  (excl holds KERNEL/WRITE adds)
+ *   shared[]    -> DMA_RESV_USAGE_READ    (shared holds READ/BOOKKEEP adds)
+ *
+ * Iteration index 0 is the exclusive fence; indices 1..N are shared[0..N-1].
+ * A fence is returned when fence_usage <= cursor->usage (same as Linux).
  */
 enum dma_resv_usage {
 	DMA_RESV_USAGE_KERNEL = 0,
@@ -167,6 +174,8 @@ struct dma_resv_iter {
 	struct dma_resv_list	*fences;
 	unsigned int		num_fences;
 	bool			is_restarted;
+	/* Unlocked iter: RCU snapshot of fence_excl (no reference). */
+	struct dma_fence	*excl;
 };
 
 static inline void
@@ -179,6 +188,7 @@ dma_resv_iter_begin(struct dma_resv_iter *cursor, struct dma_resv *obj,
 	cursor->fences = NULL;
 	cursor->num_fences = 0;
 	cursor->index = 0;
+	cursor->excl = NULL;
 	cursor->is_restarted = true;
 }
 
@@ -202,31 +212,152 @@ dma_resv_iter_is_restarted(struct dma_resv_iter *cursor)
 }
 
 static inline struct dma_fence *
-dma_resv_iter_first_unlocked(struct dma_resv_iter *cursor)
+dma_resv_iter_next(struct dma_resv_iter *cursor)
 {
-	(void)cursor;
-	return NULL;
-}
+	struct dma_resv_list *list;
+	struct dma_fence *fence;
 
-static inline struct dma_fence *
-dma_resv_iter_next_unlocked(struct dma_resv_iter *cursor)
-{
-	(void)cursor;
-	return NULL;
+	dma_resv_assert_held(cursor->obj);
+	cursor->is_restarted = false;
+
+	do {
+		if (cursor->index == 0) {
+			cursor->index = 1;
+			fence = cursor->obj->fence_excl;
+			cursor->fence_usage = DMA_RESV_USAGE_KERNEL;
+			if (fence != NULL &&
+			    cursor->fence_usage <= cursor->usage)
+				return fence;
+			continue;
+		}
+
+		list = cursor->obj->fence;
+		if (list == NULL ||
+		    (cursor->index - 1) >= list->shared_count)
+			return NULL;
+
+		fence = list->shared[cursor->index - 1];
+		cursor->index++;
+		cursor->fence_usage = DMA_RESV_USAGE_READ;
+	} while (cursor->fence_usage > cursor->usage);
+
+	return fence;
 }
 
 static inline struct dma_fence *
 dma_resv_iter_first(struct dma_resv_iter *cursor)
 {
-	(void)cursor;
-	return NULL;
+	struct dma_fence *fence;
+
+	dma_resv_assert_held(cursor->obj);
+	cursor->index = 0;
+	cursor->fences = cursor->obj->fence;
+	fence = dma_resv_iter_next(cursor);
+	cursor->is_restarted = true;
+	return fence;
+}
+
+static inline void
+dma_resv_iter_restart_unlocked(struct dma_resv_iter *cursor)
+{
+
+	cursor->index = 0;
+	cursor->excl = atomic_load_consume(&cursor->obj->fence_excl);
+	cursor->fences = atomic_load_consume(&cursor->obj->fence);
+	cursor->num_fences = cursor->fences != NULL ?
+	    atomic_load_relaxed(&cursor->fences->shared_count) : 0;
+	cursor->is_restarted = true;
+}
+
+static inline bool
+dma_resv_iter_lists_stable(struct dma_resv_iter *cursor)
+{
+
+	return atomic_load_consume(&cursor->obj->fence_excl) == cursor->excl &&
+	    atomic_load_consume(&cursor->obj->fence) == cursor->fences;
+}
+
+/*
+ * Walk to the next unsignaled fence matching the usage filter and take an
+ * RCU reference into cursor->fence.  Restarts the cursor if a fence vanishes.
+ */
+static inline void
+dma_resv_iter_walk_unlocked(struct dma_resv_iter *cursor)
+{
+	struct dma_fence *fence;
+
+	for (;;) {
+		dma_fence_put(cursor->fence);
+		cursor->fence = NULL;
+
+		if (cursor->index == 0) {
+			cursor->index = 1;
+			if (cursor->excl == NULL)
+				continue;
+			cursor->fence_usage = DMA_RESV_USAGE_KERNEL;
+			if (cursor->fence_usage > cursor->usage)
+				continue;
+			cursor->fence = dma_fence_get_rcu(cursor->excl);
+			if (cursor->fence == NULL) {
+				dma_resv_iter_restart_unlocked(cursor);
+				continue;
+			}
+			if (!dma_fence_is_signaled(cursor->fence))
+				return;
+			continue;
+		}
+
+		if (cursor->fences == NULL ||
+		    (cursor->index - 1) >= cursor->num_fences)
+			return;
+
+		fence = atomic_load_relaxed(
+		    &cursor->fences->shared[cursor->index - 1]);
+		cursor->index++;
+		cursor->fence_usage = DMA_RESV_USAGE_READ;
+		if (cursor->fence_usage > cursor->usage)
+			continue;
+		cursor->fence = dma_fence_get_rcu(fence);
+		if (cursor->fence == NULL) {
+			dma_resv_iter_restart_unlocked(cursor);
+			continue;
+		}
+		if (!dma_fence_is_signaled(cursor->fence))
+			return;
+	}
 }
 
 static inline struct dma_fence *
-dma_resv_iter_next(struct dma_resv_iter *cursor)
+dma_resv_iter_first_unlocked(struct dma_resv_iter *cursor)
 {
-	(void)cursor;
-	return NULL;
+
+	rcu_read_lock();
+	do {
+		dma_resv_iter_restart_unlocked(cursor);
+		dma_resv_iter_walk_unlocked(cursor);
+	} while (!dma_resv_iter_lists_stable(cursor));
+	rcu_read_unlock();
+
+	return cursor->fence;
+}
+
+static inline struct dma_fence *
+dma_resv_iter_next_unlocked(struct dma_resv_iter *cursor)
+{
+	bool restart;
+
+	rcu_read_lock();
+	cursor->is_restarted = false;
+	restart = !dma_resv_iter_lists_stable(cursor);
+	do {
+		if (restart)
+			dma_resv_iter_restart_unlocked(cursor);
+		dma_resv_iter_walk_unlocked(cursor);
+		restart = true;
+	} while (!dma_resv_iter_lists_stable(cursor));
+	rcu_read_unlock();
+
+	return cursor->fence;
 }
 
 #define	dma_resv_for_each_fence_unlocked(cursor, fence)			\
