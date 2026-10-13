@@ -282,9 +282,7 @@ static int amdgpu_cs_pass1(struct amdgpu_cs_parser *p,
 		case AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES:
 		case AMDGPU_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT:
 		case AMDGPU_CHUNK_ID_SYNCOBJ_TIMELINE_SIGNAL:
-#ifndef __NetBSD__		/* XXX amdgpu gfx shadow */
 		case AMDGPU_CHUNK_ID_CP_GFX_SHADOW:
-#endif
 			break;
 
 		default:
@@ -576,7 +574,6 @@ static int amdgpu_cs_p2_syncobj_timeline_signal(struct amdgpu_cs_parser *p,
 	return 0;
 }
 
-#ifndef __NetBSD__		/* XXX amdgpu gfx shadow */
 static int amdgpu_cs_p2_shadow(struct amdgpu_cs_parser *p,
 			       struct amdgpu_cs_chunk *chunk)
 {
@@ -596,7 +593,6 @@ static int amdgpu_cs_p2_shadow(struct amdgpu_cs_parser *p,
 
 	return 0;
 }
-#endif
 
 static int amdgpu_cs_pass2(struct amdgpu_cs_parser *p)
 {
@@ -640,13 +636,11 @@ static int amdgpu_cs_pass2(struct amdgpu_cs_parser *p)
 			if (r)
 				return r;
 			break;
-#ifndef __NetBSD__		/* XXX amdgpu gfx shadow */
 		case AMDGPU_CHUNK_ID_CP_GFX_SHADOW:
 			r = amdgpu_cs_p2_shadow(p, chunk);
 			if (r)
 				return r;
 			break;
-#endif
 		}
 	}
 
