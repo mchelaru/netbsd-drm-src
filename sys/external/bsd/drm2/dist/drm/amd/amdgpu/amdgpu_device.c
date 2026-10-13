@@ -3554,20 +3554,11 @@ static void amdgpu_device_delayed_init_work_handler(struct work_struct *work)
 	int r;
 
 	DRM_INFO("amdgpu: delayed_init: ib ring tests\n");
-#ifdef __NetBSD__
-	/*
-	 * TODO Currently the ring tests don't work for my Radeon 780M
-	 */
-	(void)adev;
-	(void)r;
-	DRM_INFO("amdgpu: delayed_init: ib ring tests skipped (NetBSD)\n");
-#else
 	r = amdgpu_ib_ring_tests(adev);
 	if (r)
 		DRM_ERROR("ib ring test failed (%d).\n", r);
 	else
 		DRM_INFO("amdgpu: delayed_init: ib ring tests done\n");
-#endif
 }
 
 static void amdgpu_device_delay_enable_gfx_off(struct work_struct *work)
