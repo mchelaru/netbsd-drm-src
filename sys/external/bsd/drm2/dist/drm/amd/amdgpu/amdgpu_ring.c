@@ -32,6 +32,7 @@
 #include <linux/debugfs.h>
 
 #include <drm/amdgpu_drm.h>
+#include <drm/drm_cache.h>
 #include "amdgpu.h"
 #include "atom.h"
 
@@ -167,6 +168,27 @@ void amdgpu_ring_commit(struct amdgpu_ring *ring)
 	if (count != 0)
 		ring->funcs->insert_nop(ring, count);
 
+#ifdef __NetBSD__
+	/*
+	 * Even with set_pages_array_wc(), ring BOs can still be reached via a
+	 * WB alias.  Flush the just-written DW range so the GPU sees packets.
+	 */
+	if (ring->ring) {
+		u32 start = ring->wptr_old & ring->buf_mask;
+		u32 end = ring->wptr & ring->buf_mask;
+
+		if (end >= start) {
+			drm_clflush_virt_range(&ring->ring[start],
+			    (end - start) * sizeof(uint32_t));
+		} else {
+			drm_clflush_virt_range(&ring->ring[start],
+			    (ring->buf_mask + 1 - start) * sizeof(uint32_t));
+			if (end)
+				drm_clflush_virt_range(ring->ring,
+				    end * sizeof(uint32_t));
+		}
+	}
+#endif
 	mb();
 	amdgpu_ring_set_wptr(ring);
 

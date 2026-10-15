@@ -30,6 +30,7 @@
 #include <linux/slab.h>
 
 #include <drm/amdgpu_drm.h>
+#include <drm/drm_cache.h>
 
 #include "amdgpu.h"
 #include "atom.h"
@@ -232,6 +233,17 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned int num_ibs,
 		cond_exec = amdgpu_ring_init_cond_exec(ring,
 						       ring->cond_exe_gpu_addr);
 
+#ifdef __NetBSD__
+	/*
+	 * IB pool memory is GTT; CP/SDMA fetch IBs from memory.  Without a
+	 * clflush WB cachelines will stay dirty and GPU will see garbage
+	 */
+	for (i = 0; i < num_ibs; i++) {
+		if (ibs[i].ptr && ibs[i].length_dw)
+			drm_clflush_virt_range(ibs[i].ptr,
+			    ibs[i].length_dw * 4);
+	}
+#endif
 	amdgpu_device_flush_hdp(adev, ring);
 
 	if (need_ctx_switch)

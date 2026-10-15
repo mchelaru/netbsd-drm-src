@@ -491,6 +491,11 @@ void amdgpu_gart_bind(struct amdgpu_device *adev, uint64_t offset,
 		return;
 
 	amdgpu_gart_map(adev, offset, pages, dma_addr, flags, adev->gart.ptr);
+#ifdef __NetBSD__
+	/* VRAM gart.ptr: HDP, not clflush (clflush faults on aperture VA). */
+	mb();
+	amdgpu_device_flush_hdp(adev, NULL);
+#endif
 }
 
 /**

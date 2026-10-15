@@ -1309,6 +1309,11 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 	} else if (bo_va->cleared != clear) {
 		list_splice_init(&bo_va->valids, &bo_va->invalids);
 	}
+#ifdef __NetBSD__
+	/* invalidate TLB after installing PTEs */
+	if (!clear)
+		flush_tlb = true;
+#endif
 
 	list_for_each_entry(mapping, &bo_va->invalids, list) {
 		uint64_t update_flags = flags;
@@ -2838,7 +2843,19 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
 	/* If not overridden by the user, by default, only in large BAR systems
 	 * Compute VM tables will be updated by CPU
 	 */
-#ifdef CONFIG_X86_64
+#ifdef __NetBSD__
+	/*
+	 * avoid lockups in glamor
+	 */
+	if (amdgpu_vm_update_mode == -1)
+		adev->vm_manager.vm_update_mode =
+			AMDGPU_VM_USE_CPU_FOR_GFX |
+			AMDGPU_VM_USE_CPU_FOR_COMPUTE;
+	else
+		adev->vm_manager.vm_update_mode = amdgpu_vm_update_mode;
+	DRM_INFO("NetBSD: vm_update_mode=0x%x (CPU PT updates)\n",
+		 adev->vm_manager.vm_update_mode);
+#elif defined(CONFIG_X86_64)
 	if (amdgpu_vm_update_mode == -1) {
 		/* For asic with VF MMIO access protection
 		 * avoid using CPU for VM table updates

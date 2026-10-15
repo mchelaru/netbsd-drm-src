@@ -782,10 +782,19 @@ static void amdgpu_vm_pte_fragment(struct amdgpu_vm_update_params *params,
 	 */
 	unsigned int max_frag;
 
+#ifdef __NetBSD__
+	/*
+	 * TCP WRITE faults on mapped BOs cluster in the last small fragment
+	 * after large FRAG PDE_PTE updates. Vega+ ignores vm_fragment_size
+	 * (max_frag=31). Force 4K PTEs until fixed. TODO
+	 */
+	max_frag = 0;
+#else
 	if (params->adev->asic_type < CHIP_VEGA10)
 		max_frag = params->adev->vm_manager.fragment_size;
 	else
 		max_frag = 31;
+#endif
 
 	/* system pages are non continuously */
 	if (params->pages_addr) {

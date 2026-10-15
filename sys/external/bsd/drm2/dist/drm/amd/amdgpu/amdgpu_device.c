@@ -6863,7 +6863,11 @@ bool amdgpu_device_load_pci_state(struct pci_dev *pdev)
 void amdgpu_device_flush_hdp(struct amdgpu_device *adev,
 		struct amdgpu_ring *ring)
 {
-#ifdef CONFIG_X86_64
+	/*
+	 * Linux APU assumes host/GPU coherent GTT and skips HDP. NetBSD
+	 * still needs the flush for BAR/VRAM CPU stores
+	 */
+#if defined(CONFIG_X86_64) && !defined(__NetBSD__)
 	if ((adev->flags & AMD_IS_APU) && !amdgpu_passthrough(adev))
 		return;
 #endif
@@ -6879,7 +6883,8 @@ void amdgpu_device_flush_hdp(struct amdgpu_device *adev,
 void amdgpu_device_invalidate_hdp(struct amdgpu_device *adev,
 		struct amdgpu_ring *ring)
 {
-#ifdef CONFIG_X86_64
+	/* same as above */
+#if defined(CONFIG_X86_64) && !defined(__NetBSD__)
 	if ((adev->flags & AMD_IS_APU) && !amdgpu_passthrough(adev))
 		return;
 #endif
