@@ -49,6 +49,7 @@ SRCS+=	linux_pci.c
 SRCS+=	linux_radixtree.c
 SRCS+=	linux_rwsem.c
 SRCS+=	linux_sgt.c
+SRCS+=	linux_set_memory.c
 SRCS+=	linux_stop_machine.c
 SRCS+=	linux_sync_file.c
 SRCS+=	linux_wait_bit.c

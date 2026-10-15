@@ -37,6 +37,8 @@ __KERNEL_RCSID(0, "$NetBSD: linux_module.c,v 1.14 2022/09/01 01:54:38 riastradh 
 #include <sys/once.h>
 #endif
 
+#include <asm/set_memory.h>
+
 #include <linux/atomic.h>
 #include <linux/dma-fence.h>
 #include <linux/highmem.h>
@@ -61,6 +63,12 @@ linux_init(void)
 	if (error) {
 		printf("linux: unable to initialize idr: %d\n", error);
 		goto fail0;
+	}
+
+	error = linux_set_memory_init();
+	if (error) {
+		printf("linux: unable to initialize set_memory: %d\n", error);
+		goto fail0a;
 	}
 
 	error = linux_kmap_init();
@@ -126,7 +134,8 @@ fail5:	linux_writecomb_fini();
 fail4:	linux_workqueue_fini();
 fail3:	linux_rcu_gc_fini();
 fail2:	linux_kmap_fini();
-fail1:	linux_idr_module_fini();
+fail1:	linux_set_memory_fini();
+fail0a:	linux_idr_module_fini();
 fail0:	return error;
 }
 
@@ -157,6 +166,7 @@ linux_fini(void)
 	linux_workqueue_fini();
 	linux_rcu_gc_fini();
 	linux_kmap_fini();
+	linux_set_memory_fini();
 	linux_idr_module_fini();
 }
 

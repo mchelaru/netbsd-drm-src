@@ -44,6 +44,7 @@ __KERNEL_RCSID(0, "$NetBSD: linux_kmap.c,v 1.16 2018/08/27 15:28:53 riastradh Ex
 
 #include <uvm/uvm_extern.h>
 
+#include <asm/set_memory.h>
 #include <linux/highmem.h>
 
 SDT_PROBE_DEFINE2(sdt, linux, kmap, map,
@@ -152,10 +153,15 @@ void *
 kmap_atomic(struct page *page)
 {
 	const paddr_t paddr = uvm_vm_page_to_phys(&page->p_vmp);
+	const u_int cacheflags = linux_page_pmap_cache_flags(paddr);
 	vaddr_t vaddr;
 
 #ifdef __HAVE_MM_MD_DIRECT_MAPPED_PHYS
-	if (mm_md_direct_mapped_phys(paddr, &vaddr))
+	/*
+	 * Direct map is WB large pages.  WC/UC pages must use a private
+	 * kenter with the right PAT flags (see linux_set_memory.c).
+	 */
+	if (cacheflags == 0 && mm_md_direct_mapped_phys(paddr, &vaddr))
 		goto out;
 #endif
 
@@ -163,7 +169,8 @@ kmap_atomic(struct page *page)
 	KASSERT(linux_kmap_atomic_vaddr != 0);
 	KASSERT(!pmap_extract(pmap_kernel(), linux_kmap_atomic_vaddr, NULL));
 	vaddr = linux_kmap_atomic_vaddr;
-	pmap_kenter_pa(vaddr, paddr, (VM_PROT_READ | VM_PROT_WRITE), 0);
+	pmap_kenter_pa(vaddr, paddr, (VM_PROT_READ | VM_PROT_WRITE),
+	    cacheflags);
 	pmap_update(pmap_kernel());
 
 #ifdef __HAVE_MM_MD_DIRECT_MAPPED_PHYS
@@ -206,12 +213,13 @@ void *
 kmap(struct page *page)
 {
 	const paddr_t paddr = VM_PAGE_TO_PHYS(&page->p_vmp);
+	const u_int cacheflags = linux_page_pmap_cache_flags(paddr);
 	vaddr_t vaddr;
 
 	ASSERT_SLEEPABLE();
 
 #ifdef __HAVE_MM_MD_DIRECT_MAPPED_PHYS
-	if (mm_md_direct_mapped_phys(paddr, &vaddr))
+	if (cacheflags == 0 && mm_md_direct_mapped_phys(paddr, &vaddr))
 		goto out;
 #endif
 
@@ -231,7 +239,8 @@ kmap(struct page *page)
 	mutex_exit(&linux_kmap_lock);
 
 	KASSERT(!pmap_extract(pmap_kernel(), vaddr, NULL));
-	pmap_kenter_pa(vaddr, paddr, (VM_PROT_READ | VM_PROT_WRITE), 0);
+	pmap_kenter_pa(vaddr, paddr, (VM_PROT_READ | VM_PROT_WRITE),
+	    cacheflags);
 	pmap_update(pmap_kernel());
 
 #ifdef __HAVE_MM_MD_DIRECT_MAPPED_PHYS
@@ -250,7 +259,8 @@ kunmap(struct page *page)
 	ASSERT_SLEEPABLE();
 
 #ifdef __HAVE_MM_MD_DIRECT_MAPPED_PHYS
-	if (mm_md_direct_mapped_phys(paddr, &vaddr))
+	if (!linux_page_skip_direct_map(paddr) &&
+	    mm_md_direct_mapped_phys(paddr, &vaddr))
 		goto out;
 #endif
 
