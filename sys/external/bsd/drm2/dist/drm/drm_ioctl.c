@@ -138,7 +138,24 @@ int drm_getunique(struct drm_device *dev, void *data,
 		ret = -ENXIO;
 		goto out;
 	}
-
+#ifdef __NetBSD__
+	/*
+	 * Newer Xorg/amdgpu becomes DRM master via SET_MASTER and doesn't
+	 * call SET_VERSION resulting in an empty master->unique
+	 * TODO: update the top file comment after migration complete
+	 */
+	if (master->unique == NULL) {
+		if (dev->dev && dev_is_pci(dev->dev)) {
+			ret = drm_pci_set_busid(dev, master);
+			if (ret)
+				goto out;
+		} else if (dev->unique) {
+			master->unique = kstrdup(dev->unique, GFP_KERNEL);
+			if (master->unique)
+				master->unique_len = strlen(dev->unique);
+		}
+	}
+#endif
 	/*
 	 * Copy out only if the user allocated enough space.  Either
 	 * way, on success, report the actual size -- so the user can
