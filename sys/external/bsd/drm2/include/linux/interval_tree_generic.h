@@ -107,7 +107,8 @@ PREFIX##_iter_first(struct rb_root_cached *__root, KT __start, KT __last)     \
 	__node = rb_tree_find_node_geq(&__root->rb_root.rbr_tree, &__start);  \
 	if (__node == NULL)						      \
 		return NULL;						      \
-	KASSERT(__start <= START(__node));				      \
+	if (LAST(__node) < __start)					      \
+		return NULL;						      \
 	if (__last < START(__node))					      \
 		return NULL;						      \
 									      \
