@@ -50,7 +50,8 @@ timer_setup(struct timer_list *timer, void (*fn)(struct timer_list *),
     int flags)
 {
 
-	callout_init(&timer->tl_callout, 0);
+	callout_init(&timer->tl_callout, CALLOUT_MPSAFE);
+	(void)flags;
 
 	/* XXX Super-sketchy casts!  */
 	callout_setfunc(&timer->tl_callout, (void (*)(void *))(void *)fn,
