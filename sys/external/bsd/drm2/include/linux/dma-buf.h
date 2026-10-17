@@ -39,11 +39,13 @@
 #include <linux/err.h>
 #include <linux/dma-mapping.h>
 #include <linux/dma-resv.h>
+#include <linux/list.h>
 #include <linux/scatterlist.h>
 
 struct device;
 struct dma_buf;
 struct dma_buf_attachment;
+struct dma_buf_attach_ops;
 struct dma_buf_export_info;
 struct dma_buf_ops;
 struct file;
@@ -57,6 +59,8 @@ struct dma_buf_ops {
 	bool	dynamic_mapping;
 	int	(*attach)(struct dma_buf *, struct dma_buf_attachment *);
 	void	(*detach)(struct dma_buf *, struct dma_buf_attachment *);
+	int	(*pin)(struct dma_buf_attachment *);
+	void	(*unpin)(struct dma_buf_attachment *);
 	struct sg_table *
 		(*map_dma_buf)(struct dma_buf_attachment *,
 		    enum dma_data_direction);
@@ -71,6 +75,11 @@ struct dma_buf_ops {
 	void	(*vunmap)(struct dma_buf *, void *);
 };
 
+struct dma_buf_attach_ops {
+	bool	allow_peer2peer;
+	void	(*move_notify)(struct dma_buf_attachment *attach);
+};
+
 struct dma_buf {
 	void				*priv;
 	const struct dma_buf_ops	*ops;
@@ -80,6 +89,7 @@ struct dma_buf {
 	kmutex_t			db_lock;
 	volatile unsigned		db_refcnt;
 	struct dma_resv_poll		db_resv_poll;
+	struct list_head		attachments;
 	struct dma_resv			db_resv_int[];
 };
 
@@ -88,6 +98,12 @@ struct dma_buf_attachment {
 	struct dma_buf			*dmabuf;
 	bus_dma_tag_t			dev; /* XXX expedient misnomer */
 	bool				dynamic_mapping;
+	bool				peer2peer;
+	struct sg_table			*sgt;
+	enum dma_data_direction		dir;
+	const struct dma_buf_attach_ops	*importer_ops;
+	void				*importer_priv;
+	struct list_head		node;
 };
 
 struct dma_buf_export_info {
@@ -112,9 +128,26 @@ struct dma_buf_export_info {
 #define	dma_buf_fd		linux_dma_buf_fd
 #define	dma_buf_get		linux_dma_buf_get
 #define	dma_buf_map_attachment	linux_dma_buf_map_attachment
+#define	dma_buf_move_notify	linux_dma_buf_move_notify
+#define	dma_buf_pin		linux_dma_buf_pin
 #define	dma_buf_put		linux_dma_buf_put
 #define	dma_buf_unmap_attachment linux_dma_buf_unmap_attachment
+#define	dma_buf_unpin		linux_dma_buf_unpin
 #define	get_dma_buf		linux_get_dma_buf
+
+static inline bool
+dma_buf_is_dynamic(struct dma_buf *dmabuf)
+{
+
+	return dmabuf->ops->dynamic_mapping || dmabuf->ops->pin != NULL;
+}
+
+static inline bool
+dma_buf_attachment_is_dynamic(struct dma_buf_attachment *attach)
+{
+
+	return attach->dynamic_mapping || attach->importer_ops != NULL;
+}
 
 struct dma_buf *
 	dma_buf_export(struct dma_buf_export_info *);
@@ -128,33 +161,18 @@ void	dma_buf_put(struct dma_buf *);
 struct dma_buf_attachment *
 	dma_buf_attach(struct dma_buf *, bus_dma_tag_t);
 struct dma_buf_attachment *
-	dma_buf_dynamic_attach(struct dma_buf *, bus_dma_tag_t, bool);
+	dma_buf_dynamic_attach(struct dma_buf *, bus_dma_tag_t,
+	    const struct dma_buf_attach_ops *, void *);
 void	dma_buf_detach(struct dma_buf *, struct dma_buf_attachment *);
+
+int	dma_buf_pin(struct dma_buf_attachment *);
+void	dma_buf_unpin(struct dma_buf_attachment *);
+void	dma_buf_move_notify(struct dma_buf *);
 
 struct sg_table *
 	dma_buf_map_attachment(struct dma_buf_attachment *,
 	    enum dma_data_direction);
 void	dma_buf_unmap_attachment(struct dma_buf_attachment *,
 	    struct sg_table *, enum dma_data_direction);
-
-/* XXX amdgpu: pin/unpin/move_notify not implemented on NetBSD. */
-static inline int
-dma_buf_pin(struct dma_buf_attachment *attach)
-{
-	(void)attach;
-	return 0;
-}
-
-static inline void
-dma_buf_unpin(struct dma_buf_attachment *attach)
-{
-	(void)attach;
-}
-
-static inline void
-dma_buf_move_notify(struct dma_buf *dmabuf)
-{
-	(void)dmabuf;
-}
 
 #endif  /* _LINUX_DMA_BUF_H_ */

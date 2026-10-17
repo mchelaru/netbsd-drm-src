@@ -72,8 +72,11 @@ static int amdgpu_dma_buf_attach(struct dma_buf *dmabuf,
 	if (pci_p2pdma_distance(adev->pdev, attach->dev, false) < 0)
 		attach->peer2peer = false;
 #else
+	/*
+	 * NetBSD has no pci_p2pdma helper; keep importer-provided peer2peer
+	 * (usually false) so map stays in GTT.
+	 */
 	__USE(attach);
-	__USE(bo);
 #endif
 
 	amdgpu_vm_bo_update_shared(bo);
@@ -81,7 +84,6 @@ static int amdgpu_dma_buf_attach(struct dma_buf *dmabuf,
 	return 0;
 }
 
-#ifndef __NetBSD__
 /**
  * amdgpu_dma_buf_pin - &dma_buf_ops.pin implementation
  *
@@ -112,7 +114,6 @@ static void amdgpu_dma_buf_unpin(struct dma_buf_attachment *attach)
 
 	amdgpu_bo_unpin(bo);
 }
-#endif /* !__NetBSD__ */
 
 /**
  * amdgpu_dma_buf_map - &dma_buf_ops.map_dma_buf implementation
@@ -137,39 +138,21 @@ static struct sg_table *amdgpu_dma_buf_map(struct dma_buf_attachment *attach,
 	struct sg_table *sgt;
 	long r;
 
-#ifdef __NetBSD__
-	__USE(adev);
-	/* NetBSD: no dma_buf pin ops; pin into GTT for the mapping lifetime. */
-	r = amdgpu_bo_pin(bo, AMDGPU_GEM_DOMAIN_GTT);
-	if (r)
-		return ERR_PTR(r);
-
-	sgt = drm_prime_pages_to_sg(bo->tbo.ttm->pages, bo->tbo.ttm->num_pages);
-	if (IS_ERR(sgt)) {
-		amdgpu_bo_unpin(bo);
-		return sgt;
-	}
-
-	if (dma_map_sg_attrs(attach->dev, sgt->sgl, sgt->nents, dir,
-	    DMA_ATTR_SKIP_CPU_SYNC) <= 0) {
-		sg_free_table(sgt);
-		kfree(sgt);
-		amdgpu_bo_unpin(bo);
-		return ERR_PTR(-EBUSY);
-	}
-
-	return sgt;
-#else
 	if (!bo->tbo.pin_count) {
 		/* move buffer into GTT or VRAM */
 		struct ttm_operation_ctx ctx = { false, false };
 		unsigned int domains = AMDGPU_GEM_DOMAIN_GTT;
 
+#ifndef __NetBSD__
 		if (bo->preferred_domains & AMDGPU_GEM_DOMAIN_VRAM &&
 		    attach->peer2peer) {
 			bo->flags |= AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
 			domains |= AMDGPU_GEM_DOMAIN_VRAM;
 		}
+#else
+		__USE(adev);
+		__USE(attach);
+#endif
 		amdgpu_bo_placement_from_domain(bo, domains);
 		r = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
 		if (r)
@@ -181,6 +164,16 @@ static struct sg_table *amdgpu_dma_buf_map(struct dma_buf_attachment *attach,
 
 	switch (bo->tbo.resource->mem_type) {
 	case TTM_PL_TT:
+#ifdef __NetBSD__
+		sgt = drm_prime_pages_to_sg(bo->tbo.ttm->pages,
+					    bo->tbo.ttm->num_pages);
+		if (IS_ERR(sgt))
+			return sgt;
+
+		if (dma_map_sg_attrs(attach->dev, sgt->sgl, sgt->nents, dir,
+		    DMA_ATTR_SKIP_CPU_SYNC) <= 0)
+			goto error_free;
+#else
 		sgt = drm_prime_pages_to_sg(obj->dev,
 					    bo->tbo.ttm->pages,
 					    bo->tbo.ttm->num_pages);
@@ -190,14 +183,20 @@ static struct sg_table *amdgpu_dma_buf_map(struct dma_buf_attachment *attach,
 		if (dma_map_sgtable(attach->dev, sgt, dir,
 				    DMA_ATTR_SKIP_CPU_SYNC))
 			goto error_free;
+#endif
 		break;
 
 	case TTM_PL_VRAM:
+#ifdef __NetBSD__
+		/* amdgpu_vram_mgr_alloc_sgt is ENOSYS on NetBSD. */
+		return ERR_PTR(-EINVAL);
+#else
 		r = amdgpu_vram_mgr_alloc_sgt(adev, bo->tbo.resource, 0,
 					      bo->tbo.base.size, attach->dev,
 					      dir, &sgt);
 		if (r)
 			return ERR_PTR(r);
+#endif
 		break;
 	default:
 		return ERR_PTR(-EINVAL);
@@ -209,7 +208,6 @@ error_free:
 	sg_free_table(sgt);
 	kfree(sgt);
 	return ERR_PTR(-EBUSY);
-#endif
 }
 
 /**
@@ -219,20 +217,16 @@ error_free:
  * @dir: DMA direction
  *
  * This is called when a shared DMA buffer no longer needs to be accessible by
- * another device. For now, simply unpins the buffer from GTT.
+ * another device.
  */
 static void amdgpu_dma_buf_unmap(struct dma_buf_attachment *attach,
 				 struct sg_table *sgt,
 				 enum dma_data_direction dir)
 {
 #ifdef __NetBSD__
-	struct drm_gem_object *obj = attach->dmabuf->priv;
-	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
-
 	dma_unmap_sg_attrs(attach->dev, sgt->sgl, sgt->nents, dir, 0);
 	sg_free_table(sgt);
 	kfree(sgt);
-	amdgpu_bo_unpin(bo);
 #else
 	if (sgt->sgl->page_link) {
 		dma_unmap_sgtable(attach->dev, sgt, dir, 0);
@@ -288,10 +282,9 @@ static int amdgpu_dma_buf_begin_cpu_access(struct dma_buf *dma_buf,
 
 const struct dma_buf_ops amdgpu_dmabuf_ops = {
 	.attach = amdgpu_dma_buf_attach,
-#ifndef __NetBSD__
+	.dynamic_mapping = true,
 	.pin = amdgpu_dma_buf_pin,
 	.unpin = amdgpu_dma_buf_unpin,
-#endif
 	.map_dma_buf = amdgpu_dma_buf_map,
 	.unmap_dma_buf = amdgpu_dma_buf_unmap,
 	.release = drm_gem_dmabuf_release,
@@ -379,7 +372,6 @@ error:
 	return ERR_PTR(ret);
 }
 
-#ifndef __NetBSD__
 /**
  * amdgpu_dma_buf_move_notify - &attach.move_notify implementation
  *
@@ -451,10 +443,14 @@ amdgpu_dma_buf_move_notify(struct dma_buf_attachment *attach)
 }
 
 static const struct dma_buf_attach_ops amdgpu_dma_buf_attach_ops = {
+#ifdef __NetBSD__
+	/* keep imports in GTT, no pci_p2pdma */
+	.allow_peer2peer = false,
+#else
 	.allow_peer2peer = true,
+#endif
 	.move_notify = amdgpu_dma_buf_move_notify
 };
-#endif /* !__NetBSD__ */
 
 /**
  * amdgpu_gem_prime_import - &drm_driver.gem_prime_import implementation
@@ -489,7 +485,8 @@ struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
 		return obj;
 
 #ifdef __NetBSD__
-	attach = dma_buf_dynamic_attach(dma_buf, dev->dmat, true);
+	attach = dma_buf_dynamic_attach(dma_buf, dev->dmat,
+					&amdgpu_dma_buf_attach_ops, obj);
 #else
 	attach = dma_buf_dynamic_attach(dma_buf, dev->dev,
 					&amdgpu_dma_buf_attach_ops, obj);

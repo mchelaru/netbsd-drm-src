@@ -86,6 +86,7 @@ dma_buf_export(struct dma_buf_export_info *info)
 	mutex_init(&dmabuf->db_lock, MUTEX_DEFAULT, IPL_NONE);
 	dmabuf->db_refcnt = 1;
 	dma_resv_poll_init(&dmabuf->db_resv_poll);
+	INIT_LIST_HEAD(&dmabuf->attachments);
 
 	if (dmabuf->resv == NULL) {
 		dmabuf->resv = &dmabuf->db_resv_int[0];
@@ -168,6 +169,7 @@ dma_buf_put(struct dma_buf *dmabuf)
 		return;
 	membar_acquire();
 
+	KASSERT(list_empty(&dmabuf->attachments));
 	dma_resv_poll_fini(&dmabuf->db_resv_poll);
 	mutex_destroy(&dmabuf->db_lock);
 	if (dmabuf->resv == &dmabuf->db_resv_int[0]) {
@@ -180,27 +182,71 @@ dma_buf_put(struct dma_buf *dmabuf)
 
 struct dma_buf_attachment *
 dma_buf_dynamic_attach(struct dma_buf *dmabuf, bus_dma_tag_t dmat,
-    bool dynamic_mapping)
+    const struct dma_buf_attach_ops *importer_ops, void *importer_priv)
 {
 	struct dma_buf_attachment *attach;
 	int ret = 0;
 
+	if (importer_ops != NULL && importer_ops->move_notify == NULL)
+		return ERR_PTR(-EINVAL);
+
 	attach = kmem_zalloc(sizeof(*attach), KM_SLEEP);
 	attach->dmabuf = dmabuf;
 	attach->dev = dmat;
-	attach->dynamic_mapping = dynamic_mapping;
+	attach->importer_ops = importer_ops;
+	attach->importer_priv = importer_priv;
+	attach->dynamic_mapping = (importer_ops != NULL);
+	if (importer_ops != NULL)
+		attach->peer2peer = importer_ops->allow_peer2peer;
+	INIT_LIST_HEAD(&attach->node);
 
 	mutex_enter(&dmabuf->db_lock);
 	if (dmabuf->ops->attach)
 		ret = dmabuf->ops->attach(dmabuf, attach);
-	mutex_exit(&dmabuf->db_lock);
-	if (ret)
+	if (ret) {
+		mutex_exit(&dmabuf->db_lock);
 		goto fail0;
+	}
+	list_add(&attach->node, &dmabuf->attachments);
+	mutex_exit(&dmabuf->db_lock);
 
-	if (attach->dynamic_mapping != dmabuf->ops->dynamic_mapping)
-		panic("%s: NYI", __func__);
+	/*
+	 * from linux: when importer and exporter disagree on
+	 * dynamic mappings, cache a bidirectional map and pin
+	 * a dynamic exporter
+	 */
+	if (dma_buf_attachment_is_dynamic(attach) !=
+	    dma_buf_is_dynamic(dmabuf)) {
+		struct sg_table *sgt;
+
+		dma_resv_lock(dmabuf->resv, NULL);
+		if (dma_buf_is_dynamic(dmabuf)) {
+			ret = dma_buf_pin(attach);
+			if (ret)
+				goto fail_unlock;
+		}
+
+		sgt = dmabuf->ops->map_dma_buf(attach, DMA_BIDIRECTIONAL);
+		if (sgt == NULL)
+			sgt = ERR_PTR(-ENOMEM);
+		if (IS_ERR(sgt)) {
+			ret = PTR_ERR(sgt);
+			goto fail_unpin;
+		}
+		dma_resv_unlock(dmabuf->resv);
+		attach->sgt = sgt;
+		attach->dir = DMA_BIDIRECTIONAL;
+	}
 
 	return attach;
+
+fail_unpin:
+	if (dma_buf_is_dynamic(dmabuf))
+		dma_buf_unpin(attach);
+fail_unlock:
+	dma_resv_unlock(dmabuf->resv);
+	dma_buf_detach(dmabuf, attach);
+	return ERR_PTR(ret);
 
 fail0:	kmem_free(attach, sizeof(*attach));
 	return ERR_PTR(ret);
@@ -210,14 +256,26 @@ struct dma_buf_attachment *
 dma_buf_attach(struct dma_buf *dmabuf, bus_dma_tag_t dmat)
 {
 
-	return dma_buf_dynamic_attach(dmabuf, dmat, /*dynamic_mapping*/false);
+	return dma_buf_dynamic_attach(dmabuf, dmat, NULL, NULL);
 }
 
 void
 dma_buf_detach(struct dma_buf *dmabuf, struct dma_buf_attachment *attach)
 {
 
+	KASSERT(attach->dmabuf == dmabuf);
+
+	dma_resv_lock(dmabuf->resv, NULL);
+	if (attach->sgt != NULL) {
+		dmabuf->ops->unmap_dma_buf(attach, attach->sgt, attach->dir);
+		if (dma_buf_is_dynamic(dmabuf))
+			dma_buf_unpin(attach);
+		attach->sgt = NULL;
+	}
+	dma_resv_unlock(dmabuf->resv);
+
 	mutex_enter(&dmabuf->db_lock);
+	list_del(&attach->node);
 	if (dmabuf->ops->detach)
 		dmabuf->ops->detach(dmabuf, attach);
 	mutex_exit(&dmabuf->db_lock);
@@ -225,17 +283,73 @@ dma_buf_detach(struct dma_buf *dmabuf, struct dma_buf_attachment *attach)
 	kmem_free(attach, sizeof(*attach));
 }
 
+int
+dma_buf_pin(struct dma_buf_attachment *attach)
+{
+	struct dma_buf *dmabuf = attach->dmabuf;
+	int ret = 0;
+
+	dma_resv_assert_held(dmabuf->resv);
+
+	if (dmabuf->ops->pin)
+		ret = dmabuf->ops->pin(attach);
+
+	return ret;
+}
+
+void
+dma_buf_unpin(struct dma_buf_attachment *attach)
+{
+	struct dma_buf *dmabuf = attach->dmabuf;
+
+	dma_resv_assert_held(dmabuf->resv);
+
+	if (dmabuf->ops->unpin)
+		dmabuf->ops->unpin(attach);
+}
+
+void
+dma_buf_move_notify(struct dma_buf *dmabuf)
+{
+	struct dma_buf_attachment *attach;
+
+	dma_resv_assert_held(dmabuf->resv);
+
+	list_for_each_entry(attach, &dmabuf->attachments, node) {
+		if (attach->importer_ops != NULL &&
+		    attach->importer_ops->move_notify != NULL)
+			attach->importer_ops->move_notify(attach);
+	}
+}
+
 struct sg_table *
 dma_buf_map_attachment(struct dma_buf_attachment *attach,
     enum dma_data_direction dir)
 {
+	struct dma_buf *dmabuf = attach->dmabuf;
 	struct sg_table *sg;
+	bool need_lock = dma_buf_is_dynamic(dmabuf);
 
-	if (attach->dmabuf->ops->dynamic_mapping)
-		dma_resv_lock(attach->dmabuf->resv, NULL);
-	sg = attach->dmabuf->ops->map_dma_buf(attach, dir);
-	if (attach->dmabuf->ops->dynamic_mapping)
-		dma_resv_unlock(attach->dmabuf->resv);
+	if (attach->sgt != NULL) {
+		if (attach->dir != dir && attach->dir != DMA_BIDIRECTIONAL)
+			return ERR_PTR(-EBUSY);
+		return attach->sgt;
+	}
+
+	if (need_lock)
+		dma_resv_lock(dmabuf->resv, NULL);
+
+	sg = dmabuf->ops->map_dma_buf(attach, dir);
+	if (sg == NULL)
+		sg = ERR_PTR(-ENOMEM);
+
+	if (!IS_ERR(sg) && dmabuf->ops->cache_sgt_mapping) {
+		attach->sgt = sg;
+		attach->dir = dir;
+	}
+
+	if (need_lock)
+		dma_resv_unlock(dmabuf->resv);
 
 	return sg;
 }
@@ -244,12 +358,17 @@ void
 dma_buf_unmap_attachment(struct dma_buf_attachment *attach,
     struct sg_table *sg, enum dma_data_direction dir)
 {
+	struct dma_buf *dmabuf = attach->dmabuf;
+	bool need_lock = dma_buf_is_dynamic(dmabuf);
 
-	if (attach->dmabuf->ops->dynamic_mapping)
-		dma_resv_lock(attach->dmabuf->resv, NULL);
-	attach->dmabuf->ops->unmap_dma_buf(attach, sg, dir);
-	if (attach->dmabuf->ops->dynamic_mapping)
-		dma_resv_unlock(attach->dmabuf->resv);
+	if (attach->sgt == sg)
+		return;
+
+	if (need_lock)
+		dma_resv_lock(dmabuf->resv, NULL);
+	dmabuf->ops->unmap_dma_buf(attach, sg, dir);
+	if (need_lock)
+		dma_resv_unlock(dmabuf->resv);
 }
 
 static int
