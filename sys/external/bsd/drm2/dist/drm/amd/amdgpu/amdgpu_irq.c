@@ -344,6 +344,7 @@ int amdgpu_irq_init(struct amdgpu_device *adev)
 #endif
 
 	adev->irq.installed = true;
+	adev_to_drm(adev)->irq_enabled = true;
 	adev_to_drm(adev)->max_vblank_count = 0x00ffffff;
 
 	DRM_DEBUG("amdgpu: irq initialized.\n");
@@ -366,6 +367,7 @@ void amdgpu_irq_fini_hw(struct amdgpu_device *adev)
 		free_irq(adev->irq.irq, adev_to_drm(adev));
 #endif
 		adev->irq.installed = false;
+		adev_to_drm(adev)->irq_enabled = false;
 		if (adev->irq.msi_enabled)
 			pci_free_irq_vectors(adev->pdev);
 	}

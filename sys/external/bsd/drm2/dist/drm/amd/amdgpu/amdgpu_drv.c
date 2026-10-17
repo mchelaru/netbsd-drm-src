@@ -2959,6 +2959,18 @@ static const struct uvm_pagerops amdgpu_gem_uvm_ops = {
 };
 #endif
 
+#ifdef __NetBSD__
+static bool
+amdgpu_get_crtc_scanout_position(struct drm_device *dev, unsigned int pipe,
+				 bool in_vblank_irq, int *vpos, int *hpos,
+				 ktime_t *stime, ktime_t *etime,
+				 const struct drm_display_mode *mode)
+{
+	return amdgpu_display_get_crtc_scanoutpos(dev, pipe, 0, vpos, hpos,
+						  stime, etime, mode);
+}
+#endif
+
 static struct drm_driver amdgpu_kms_driver = {
 	.driver_features =
 	    DRIVER_ATOMIC |
@@ -2976,6 +2988,8 @@ static struct drm_driver amdgpu_kms_driver = {
 	.irq_handler = amdgpu_driver_irq_handler,
 	.request_irq = drm_pci_request_irq,
 	.free_irq = drm_pci_free_irq,
+	.get_vblank_timestamp = drm_calc_vbltimestamp_from_scanoutpos,
+	.get_scanout_position = amdgpu_get_crtc_scanout_position,
 #endif
 	.ioctls = amdgpu_ioctls_kms,
 	.num_ioctls = ARRAY_SIZE(amdgpu_ioctls_kms),
