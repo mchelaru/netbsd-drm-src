@@ -31,6 +31,7 @@
 #include <linux/dma-fence.h>
 #include <linux/dma-resv.h>
 #include <linux/completion.h>
+#include <linux/kthread.h>
 #include <linux/workqueue.h>
 
 #define MAX_WAIT_SCHED_ENTITY_Q_EMPTY msecs_to_jiffies(1000)
@@ -417,7 +418,12 @@ drm_sched_job_init_credits(struct drm_sched_job *job,
 static inline void
 drm_sched_wqueue_stop(struct drm_gpu_scheduler *sched)
 {
-	drm_sched_stop(sched, NULL);
+	/*
+	 * drm_sched_stop(sched, NULL);
+	 * TODO: FIXME
+	 */
+	if (sched && sched->thread)
+		kthread_park(sched->thread);
 }
 
 static inline void

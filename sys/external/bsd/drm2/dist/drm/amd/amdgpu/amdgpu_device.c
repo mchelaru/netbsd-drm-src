@@ -41,6 +41,7 @@
 #include <linux/apple-gmux.h>
 
 #include <drm/drm_atomic_helper.h>
+#include <drm/drm_cache.h>
 #include <drm/drm_client_event.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_probe_helper.h>
@@ -1591,6 +1592,11 @@ static int amdgpu_device_wb_init(struct amdgpu_device *adev)
 
 		/* clear wb memory */
 		memset(__UNVOLATILE(adev->wb.wb), 0, AMDGPU_MAX_WB * sizeof(uint32_t) * 8);
+#ifdef __NetBSD__
+		drm_clflush_virt_range(__UNVOLATILE(adev->wb.wb),
+				       AMDGPU_MAX_WB * sizeof(uint32_t) * 8);
+		mb();
+#endif
 	}
 
 	return 0;
@@ -6004,7 +6010,9 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 			      struct amdgpu_reset_context *reset_context)
 {
 	struct list_head device_list, *device_list_handle =  NULL;
+#ifndef __NetBSD__
 	bool job_signaled = false;
+#endif
 	struct amdgpu_hive_info *hive = NULL;
 	struct amdgpu_device *tmp_adev = NULL;
 	int i, r = 0;
@@ -6087,6 +6095,23 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 
 		amdgpu_device_set_mp1_state(tmp_adev);
 
+#ifdef __NetBSD__
+		/*
+		 * TDR runs on the ordered system_wq. Force-signal HW fences
+		 * before drm_sched_stop (which waits on finished fences) so
+		 * we cannot deadlock the wq and leave syncobj waiters asleep
+		 * when recovery stalls
+		 */
+		for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
+			struct amdgpu_ring *ring = tmp_adev->rings[i];
+
+			if (!ring || !ring->fence_drv.initialized)
+				continue;
+			amdgpu_fence_driver_clear_job_fences(ring);
+			amdgpu_fence_driver_force_completion(ring);
+		}
+#endif
+
 		/*
 		 * Try to put the audio codec into suspend state
 		 * before gpu reset started.
@@ -6102,7 +6127,12 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 
 		amdgpu_ras_set_error_query_ready(tmp_adev, false);
 
+#ifdef __NetBSD__
+		/* Same ordered system_wq as TDR; sync cancel can deadlock */
+		cancel_delayed_work(&tmp_adev->delayed_init_work);
+#else
 		cancel_delayed_work_sync(&tmp_adev->delayed_init_work);
+#endif
 
 		amdgpu_amdkfd_pre_reset(tmp_adev, reset_context);
 
@@ -6142,11 +6172,18 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 	 *
 	 * job->base holds a reference to parent fence
 	 */
+#ifdef __NetBSD__
+	/*
+	 * Do not skip HW reset when the guilty fence is already signaled.
+	 * we force complete HW fences before drm_sched_stop (see above)
+	 */
+#else
 	if (job && dma_fence_is_signaled(&job->hw_fence)) {
 		job_signaled = true;
 		dev_info(adev->dev, "Guilty job already signaled, skipping HW reset");
 		goto skip_hw_reset;
 	}
+#endif
 
 retry:	/* Rest of adevs pre asic reset from XGMI hive. */
 	list_for_each_entry(tmp_adev, device_list_handle, reset_list) {
@@ -6191,7 +6228,9 @@ retry:	/* Rest of adevs pre asic reset from XGMI hive. */
 		amdgpu_device_stop_pending_resets(tmp_adev);
 	}
 
+#ifndef __NetBSD__
 skip_hw_reset:
+#endif
 
 	/* Post ASIC reset for all devs .*/
 	list_for_each_entry(tmp_adev, device_list_handle, reset_list) {
@@ -6205,7 +6244,11 @@ skip_hw_reset:
 			drm_sched_start(&ring->sched, 0);
 		}
 
+#ifdef __NetBSD__
+		if (!drm_drv_uses_atomic_modeset(adev_to_drm(tmp_adev)))
+#else
 		if (!drm_drv_uses_atomic_modeset(adev_to_drm(tmp_adev)) && !job_signaled)
+#endif
 			drm_helper_resume_force_mode(adev_to_drm(tmp_adev));
 
 		if (tmp_adev->asic_reset_res)
@@ -6252,6 +6295,23 @@ skip_sched_resume:
 
 	tmp_adev = list_first_entry(device_list_handle, struct amdgpu_device,
 					    reset_list);
+#ifdef __NetBSD__
+	/*
+	 * Guarantee HW fences are signaled even if asic reset failed partway,
+	 * so syncobj/dma_fence waiters cannot sleep forever after recovery
+	 */
+	list_for_each_entry(tmp_adev, device_list_handle, reset_list) {
+		for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
+			struct amdgpu_ring *ring = tmp_adev->rings[i];
+
+			if (!ring || !ring->fence_drv.initialized)
+				continue;
+			amdgpu_fence_driver_force_completion(ring);
+		}
+	}
+	tmp_adev = list_first_entry(device_list_handle, struct amdgpu_device,
+				    reset_list);
+#endif
 	amdgpu_device_unlock_reset_domain(tmp_adev->reset_domain);
 
 end_reset:
@@ -6260,8 +6320,7 @@ end_reset:
 		amdgpu_put_xgmi_hive(hive);
 	}
 
-	if (r)
-		dev_info(adev->dev, "GPU reset end with ret = %d\n", r);
+	dev_info(adev->dev, "GPU reset end with ret = %d\n", r);
 
 	atomic_set(&adev->reset_domain->reset_res, r);
 	return r;

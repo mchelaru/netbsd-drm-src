@@ -28,6 +28,9 @@
 #include <drm/gpu_scheduler.h>
 #include <drm/drm_print.h>
 #include <drm/drm_suballoc.h>
+#ifdef __NetBSD__
+#include <linux/ktime.h>
+#endif
 
 struct amdgpu_device;
 struct amdgpu_ring;
@@ -306,6 +309,16 @@ struct amdgpu_ring {
 
 	bool            is_sw_ring;
 	unsigned int    entry_index;
+
+#ifdef __NetBSD__
+	/*
+	 * Soft recovery can succeed repeatedly while the GPU keeps hanging
+	 * (TDR storm).  Track recent successes so job timeout can escalate
+	 * to ring/full reset instead of looping forever.
+	 */
+	unsigned int		soft_recovery_streak;
+	ktime_t			soft_recovery_last;
+#endif
 
 };
 

@@ -269,6 +269,16 @@ int amdgpu_bo_create_reserved(struct amdgpu_device *adev,
 	bp.flags = cpu_addr ? AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED
 		: AMDGPU_GEM_CREATE_NO_CPU_ACCESS;
 	bp.flags |= AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS;
+#ifdef __NetBSD__
+	/*
+	 * Rings, fence WB, and IB pools are GTT kernel BOs the GPU writes and
+	 * the CPU polls. NetBSD cannot flip the amd64 direct map to WC, so
+	 * unmarked pages stay WB there and GPU writebacks are invisible.
+	 * USWC records the paddr and forces kmap/vmap off the WB alias.
+	 */
+	if (cpu_addr && (domain & AMDGPU_GEM_DOMAIN_GTT))
+		bp.flags |= AMDGPU_GEM_CREATE_CPU_GTT_USWC;
+#endif
 	bp.type = ttm_bo_type_kernel;
 	bp.resv = NULL;
 	bp.bo_ptr_size = sizeof(struct amdgpu_bo);

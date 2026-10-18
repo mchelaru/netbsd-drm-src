@@ -23,6 +23,7 @@
 
 #include <linux/firmware.h>
 #include <linux/module.h>
+#include <drm/drm_cache.h>
 #include "amdgpu.h"
 #include "soc15_common.h"
 #include "soc21.h"
@@ -192,6 +193,10 @@ static int mes_v11_0_submit_pkt_and_poll_completion(struct amdgpu_mes *mes,
 	status_gpu_addr = adev->wb.gpu_addr + (status_offset * 4);
 	status_ptr = (u64 *)&adev->wb.wb[status_offset];
 	*status_ptr = 0;
+#ifdef __NetBSD__
+	drm_clflush_virt_range(status_ptr, sizeof(*status_ptr));
+	mb();
+#endif
 
 	spin_lock_irqsave(&mes->ring_lock[0], flags);
 	r = amdgpu_ring_alloc(ring, (size + sizeof(mes_status_pkt)) / 4);
@@ -238,6 +243,10 @@ static int mes_v11_0_submit_pkt_and_poll_completion(struct amdgpu_mes *mes,
 			x_pkt->header.opcode);
 
 	r = amdgpu_fence_wait_polling(ring, seq, timeout);
+#ifdef __NetBSD__
+	drm_clflush_virt_range(status_ptr, sizeof(*status_ptr));
+	mb();
+#endif
 	if (r < 1 || !*status_ptr) {
 
 		if (misc_op_str)
