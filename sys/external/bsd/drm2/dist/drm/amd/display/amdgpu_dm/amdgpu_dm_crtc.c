@@ -28,12 +28,40 @@
 
 #include "dc.h"
 #include "amdgpu.h"
-#include "amdgpu_dm_psr.h"
-#include "amdgpu_dm_replay.h"
 #include "amdgpu_dm_crtc.h"
 #include "amdgpu_dm_plane.h"
 #include "amdgpu_dm_trace.h"
 #include "amdgpu_dm_debugfs.h"
+
+#ifdef __NetBSD__
+/*
+ * TODO: fix stubs
+ */
+static inline void amdgpu_dm_psr_enable(struct dc_stream_state *stream)
+{
+}
+
+static inline bool amdgpu_dm_psr_disable(struct dc_stream_state *stream,
+					 bool wait)
+{
+	return true;
+}
+
+static inline bool
+amdgpu_dm_psr_is_active_allowed(struct amdgpu_display_manager *dm)
+{
+	return false;
+}
+
+static inline bool amdgpu_dm_replay_enable(struct dc_stream_state *stream,
+					   bool enable)
+{
+	return false;
+}
+#else
+#include "amdgpu_dm_psr.h"
+#include "amdgpu_dm_replay.h"
+#endif
 
 #define HPD_DETECTION_PERIOD_uS 2000000
 #define HPD_DETECTION_TIME_uS 100000
@@ -228,7 +256,7 @@ struct idle_workqueue *idle_create_workqueue(struct amdgpu_device *adev)
 	struct idle_workqueue *idle_work;
 
 	idle_work = kzalloc(sizeof(*idle_work), GFP_KERNEL);
-	if (ZERO_OR_NULL_PTR(idle_work))
+	if (IS_ERR_OR_NULL(idle_work))
 		return NULL;
 
 	idle_work->dm = &adev->dm;
@@ -548,7 +576,10 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.get_vblank_counter = amdgpu_get_vblank_counter_kms,
 	.enable_vblank = amdgpu_dm_crtc_enable_vblank,
 	.disable_vblank = amdgpu_dm_crtc_disable_vblank,
+#ifndef __NetBSD__
+	/* TODO */
 	.get_vblank_timestamp = drm_crtc_vblank_helper_get_vblank_timestamp,
+#endif
 #if defined(CONFIG_DEBUG_FS)
 	.late_register = amdgpu_dm_crtc_late_register,
 #endif
@@ -616,11 +647,17 @@ static bool amdgpu_dm_crtc_helper_mode_fixup(struct drm_crtc *crtc,
 	return true;
 }
 
+#ifdef __NetBSD__
+static int amdgpu_dm_crtc_helper_atomic_check(struct drm_crtc *crtc,
+					      struct drm_crtc_state *crtc_state)
+#else
 static int amdgpu_dm_crtc_helper_atomic_check(struct drm_crtc *crtc,
 					      struct drm_atomic_state *state)
+#endif
 {
-	struct drm_crtc_state *crtc_state = drm_atomic_get_new_crtc_state(state,
-										crtc);
+#ifndef __NetBSD__
+	struct drm_crtc_state *crtc_state = drm_atomic_get_new_crtc_state(state, crtc);
+#endif
 	struct amdgpu_device *adev = drm_to_adev(crtc->dev);
 	struct dc *dc = adev->dm.dc;
 	struct dm_crtc_state *dm_crtc_state = to_dm_crtc_state(crtc_state);
@@ -674,7 +711,10 @@ static const struct drm_crtc_helper_funcs amdgpu_dm_crtc_helper_funcs = {
 	.disable = amdgpu_dm_crtc_helper_disable,
 	.atomic_check = amdgpu_dm_crtc_helper_atomic_check,
 	.mode_fixup = amdgpu_dm_crtc_helper_mode_fixup,
+#ifndef __NetBSD__
+	/* TODO */
 	.get_scanout_position = amdgpu_crtc_get_scanout_position,
+#endif
 };
 
 int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,

@@ -554,10 +554,12 @@ SRCS+=	amdgpu_display_rq_dlg_calc_21.c
 SRCS+=	amdgpu_display_rq_dlg_helpers.c
 SRCS+=	amdgpu_dm.c
 SRCS+=	amdgpu_dm_color.c
+SRCS+=	amdgpu_dm_crtc.c
 # HDCP skipped: CONFIG_DRM_AMD_DC_HDCP off (simpler Phoenix bring-up)
 SRCS+=	amdgpu_dm_helpers.c
 SRCS+=	amdgpu_dm_irq.c
 SRCS+=	amdgpu_dm_mst_types.c
+SRCS+=	amdgpu_dm_plane.c
 SRCS+=	amdgpu_dm_pp_smu.c
 SRCS+=	amdgpu_dm_services.c
 SRCS+=	amdgpu_dc_stubs.c

@@ -61,6 +61,8 @@ struct amdgpu_dm_irq_handler_data;
 struct dc;
 struct amdgpu_bo;
 struct dmub_srv;
+struct idle_workqueue;
+struct workqueue_struct;
 
 struct common_irq_params {
 	struct amdgpu_device *adev;
@@ -320,6 +322,28 @@ struct amdgpu_display_manager {
 	 * DAL fb/gart memory allocation list, for communication with SMU.
 	 */
 	struct list_head da_list;
+
+	/**
+	 * @vblank_control_workqueue:
+	 *
+	 * Deferred vblank enable/disable work (panel self-refresh). Optional;
+	 * NULL when unused.
+	 */
+	struct workqueue_struct *vblank_control_workqueue;
+
+	/**
+	 * @idle_workqueue:
+	 *
+	 * Idle optimization worker. Optional; NULL when unused.
+	 */
+	struct idle_workqueue *idle_workqueue;
+
+	/**
+	 * @active_vblank_irq_count:
+	 *
+	 * Number of CRTCs with vblank IRQ enabled (for idle/PSR decisions).
+	 */
+	unsigned int active_vblank_irq_count;
 };
 
 struct amdgpu_dm_connector {
@@ -370,6 +394,9 @@ struct amdgpu_dm_connector {
 	uint32_t debugfs_dpcd_size;
 #endif
 	bool force_yuv420_output;
+
+	/* When set, panel self-refresh entry is disallowed for this connector. */
+	bool disallow_edp_enter_psr;
 };
 
 #define to_amdgpu_dm_connector(x) container_of(x, struct amdgpu_dm_connector, base)
@@ -378,12 +405,63 @@ extern const struct amdgpu_ip_block_version dm_ip_block;
 
 struct amdgpu_framebuffer;
 struct amdgpu_display_manager;
+struct amdgpu_crtc;
 struct dc_validation_set;
 struct dc_plane_state;
+
+/**
+ * enum amdgpu_transfer_function - predefined 1D transfer functions for color
+ * properties (plane/CRTC). Values match Linux amdgpu KMS uAPI.
+ */
+enum amdgpu_transfer_function {
+	AMDGPU_TRANSFER_FUNCTION_DEFAULT,
+	AMDGPU_TRANSFER_FUNCTION_IDENTITY,
+	AMDGPU_TRANSFER_FUNCTION_SRGB,
+	AMDGPU_TRANSFER_FUNCTION_BT709,
+	AMDGPU_TRANSFER_FUNCTION_PQ,
+	AMDGPU_TRANSFER_FUNCTION_GAMMA22,
+	AMDGPU_TRANSFER_FUNCTION_GAMMA24,
+	AMDGPU_TRANSFER_FUNCTION_GAMMA26,
+	AMDGPU_TRANSFER_FUNCTION_HLG,
+	AMDGPU_TRANSFER_FUNCTION_COUNT
+};
+
+#define AMDGPU_HDR_MULT_DEFAULT (0x100000000ULL)
+
+enum amdgpu_dm_cursor_mode {
+	DM_CURSOR_NATIVE_MODE = 0,
+	DM_CURSOR_OVERLAY_MODE,
+};
+
+struct idle_workqueue {
+	struct work_struct work;
+	struct amdgpu_display_manager *dm;
+	bool enable;
+	bool running;
+};
+
+struct vblank_control_work {
+	struct work_struct work;
+	struct amdgpu_display_manager *dm;
+	struct amdgpu_crtc *acrtc;
+	struct dc_stream_state *stream;
+	bool enable;
+};
 
 struct dm_plane_state {
 	struct drm_plane_state base;
 	struct dc_plane_state *dc_state;
+
+	/* Color mgmt blobs/TFs (used when AMD_PRIVATE_COLOR is enabled). */
+	struct drm_property_blob *degamma_lut;
+	struct drm_property_blob *ctm;
+	struct drm_property_blob *shaper_lut;
+	struct drm_property_blob *lut3d;
+	struct drm_property_blob *blend_lut;
+	enum amdgpu_transfer_function degamma_tf;
+	enum amdgpu_transfer_function shaper_tf;
+	enum amdgpu_transfer_function blend_tf;
+	uint64_t hdr_mult;
 };
 
 struct dm_crtc_state {
@@ -409,6 +487,10 @@ struct dm_crtc_state {
 	struct dc_info_packet vrr_infopacket;
 
 	int abm_level;
+
+	enum amdgpu_transfer_function regamma_tf;
+	bool mpo_requested;
+	enum amdgpu_dm_cursor_mode cursor_mode;
 };
 
 #define to_dm_crtc_state(x) container_of(x, struct dm_crtc_state, base)

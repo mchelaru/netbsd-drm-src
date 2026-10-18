@@ -27,9 +27,12 @@
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_blend.h>
 #include "drm/drm_framebuffer.h"
+#ifndef __NetBSD__
 #include <drm/drm_gem_atomic_helper.h>
+#endif
 #include <drm/drm_plane_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
+#include <drm/drm_damage_helper.h>
 #include <drm/drm_fourcc.h>
 
 #include "amdgpu.h"
@@ -39,6 +42,10 @@
 #include "amdgpu_dm_plane.h"
 #include "gc/gc_11_0_0_offset.h"
 #include "gc/gc_11_0_0_sh_mask.h"
+
+#ifdef __NetBSD__
+#include <linux/nbsd-namespace.h>
+#endif
 
 /*
  * TODO: these are currently initialized to rgb formats only.
@@ -54,10 +61,12 @@ static const uint32_t rgb_formats[] = {
 	DRM_FORMAT_XBGR2101010,
 	DRM_FORMAT_ARGB2101010,
 	DRM_FORMAT_ABGR2101010,
+#ifndef __NetBSD__
 	DRM_FORMAT_XRGB16161616,
 	DRM_FORMAT_XBGR16161616,
 	DRM_FORMAT_ARGB16161616,
 	DRM_FORMAT_ABGR16161616,
+#endif
 	DRM_FORMAT_XBGR8888,
 	DRM_FORMAT_ABGR8888,
 	DRM_FORMAT_RGB565,
@@ -115,8 +124,10 @@ void amdgpu_dm_plane_fill_blending_from_plane_state(const struct drm_plane_state
 			DRM_FORMAT_ABGR8888,
 			DRM_FORMAT_ARGB2101010,
 			DRM_FORMAT_ABGR2101010,
+#ifndef __NetBSD__
 			DRM_FORMAT_ARGB16161616,
 			DRM_FORMAT_ABGR16161616,
+#endif
 			DRM_FORMAT_ARGB16161616F,
 		};
 		uint32_t format = plane_state->fb->format->format;
@@ -928,8 +939,12 @@ static int amdgpu_dm_plane_helper_prepare_fb(struct drm_plane *plane,
 	struct drm_gem_object *obj;
 	struct amdgpu_device *adev;
 	struct amdgpu_bo *rbo;
-	struct dm_plane_state *dm_plane_state_new, *dm_plane_state_old;
+	struct dm_plane_state *dm_plane_state_new;
+#ifndef __NetBSD__
+	struct dm_plane_state *dm_plane_state_old;
+#endif
 	uint32_t domain;
+	uint64_t tiling_flags;
 	int r;
 
 	if (!new_state->fb) {
@@ -938,7 +953,11 @@ static int amdgpu_dm_plane_helper_prepare_fb(struct drm_plane *plane,
 	}
 
 	afb = to_amdgpu_framebuffer(new_state->fb);
+#ifdef __NetBSD__
+	obj = new_state->fb->obj[0];
+#else
 	obj = drm_gem_fb_get_obj(new_state->fb, 0);
+#endif
 	if (!obj) {
 		DRM_ERROR("Failed to get obj from framebuffer\n");
 		return -EINVAL;
@@ -952,19 +971,44 @@ static int amdgpu_dm_plane_helper_prepare_fb(struct drm_plane *plane,
 		return r;
 	}
 
+#ifndef __NetBSD__
 	r = dma_resv_reserve_fences(rbo->tbo.base.resv, 1);
 	if (r) {
 		dev_err(adev->dev, "reserving fence slot failed (%d)\n", r);
 		goto error_unlock;
 	}
+#endif
 
-	if (plane->type != DRM_PLANE_TYPE_CURSOR)
-		domain = amdgpu_display_supported_domains(adev, rbo->flags);
-	else
+	if (plane->type != DRM_PLANE_TYPE_CURSOR) {
+#ifdef __NetBSD__
+		/*
+		 * Cached APU sysmem aper: pin primary in VRAM so ShadowFB mmap
+		 * and HUBP share one buffer (GTT mirror + WC memcpy garbled).
+		 */
+		if ((adev->flags & AMD_IS_APU) &&
+		    adev->mman.aper_base_kaddr != NULL &&
+		    adev->mman.aper_map_size != 0)
+			domain = AMDGPU_GEM_DOMAIN_VRAM;
+		else if (adev->flags & AMD_IS_APU)
+			domain = AMDGPU_GEM_DOMAIN_GTT;
+		else
+#endif
+			domain = amdgpu_display_supported_domains(adev, rbo->flags);
+	} else {
 		domain = AMDGPU_GEM_DOMAIN_VRAM;
+	}
 
 	rbo->flags |= AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS;
 	r = amdgpu_bo_pin(rbo, domain);
+#ifdef __NetBSD__
+	if (r != 0 && domain == AMDGPU_GEM_DOMAIN_VRAM &&
+	    (adev->flags & AMD_IS_APU)) {
+		DRM_INFO("amdgpu: prepare_fb VRAM pin failed %d, trying GTT\n",
+			 r);
+		domain = AMDGPU_GEM_DOMAIN_GTT;
+		r = amdgpu_bo_pin(rbo, domain);
+	}
+#endif
 	if (unlikely(r != 0)) {
 		if (r != -ERESTARTSYS)
 			DRM_ERROR("Failed to pin framebuffer with error %d\n", r);
@@ -977,9 +1021,15 @@ static int amdgpu_dm_plane_helper_prepare_fb(struct drm_plane *plane,
 		goto error_unpin;
 	}
 
+#ifndef __NetBSD__
+	/* drm_gem_atomic_helper.c is not built on NetBSD. */
 	r = drm_gem_plane_helper_prepare_fb(plane, new_state);
 	if (unlikely(r != 0))
 		goto error_unpin;
+#endif
+
+	amdgpu_bo_get_tiling_flags(rbo, &tiling_flags);
+	afb->tiling_flags = tiling_flags;
 
 	amdgpu_bo_unreserve(rbo);
 
@@ -987,19 +1037,21 @@ static int amdgpu_dm_plane_helper_prepare_fb(struct drm_plane *plane,
 
 	amdgpu_bo_ref(rbo);
 
-	/**
-	 * We don't do surface updates on planes that have been newly created,
-	 * but we also don't have the afb->address during atomic check.
-	 *
-	 * Fill in buffer attributes depending on the address here, but only on
-	 * newly created planes since they're not being used by DC yet and this
-	 * won't modify global state.
-	 */
-	dm_plane_state_old = to_dm_plane_state(plane->state);
 	dm_plane_state_new = to_dm_plane_state(new_state);
+#ifndef __NetBSD__
+	dm_plane_state_old = to_dm_plane_state(plane->state);
+#endif
 
-	if (dm_plane_state_new->dc_state &&
-	    dm_plane_state_old->dc_state != dm_plane_state_new->dc_state) {
+	/*
+	 * Always refresh DC plane address after pin/GART bind on NetBSD.
+	 * Skipping when dc_state pointers are equal leaves HUBP on a
+	 * stale/zero address (white screen with ShadowFB).
+	 */
+	if (dm_plane_state_new->dc_state
+#ifndef __NetBSD__
+	    && dm_plane_state_old->dc_state != dm_plane_state_new->dc_state
+#endif
+	    ) {
 		struct dc_plane_state *plane_state =
 			dm_plane_state_new->dc_state;
 
@@ -1221,6 +1273,69 @@ int amdgpu_dm_plane_fill_dc_scaling_info(struct amdgpu_device *adev,
 	return 0;
 }
 
+#ifdef __NetBSD__
+static int amdgpu_dm_plane_atomic_check(struct drm_plane *plane,
+					struct drm_plane_state *new_plane_state)
+{
+	struct amdgpu_device *adev = drm_to_adev(plane->dev);
+	struct dc *dc = adev->dm.dc;
+	struct dm_plane_state *dm_plane_state;
+	struct dc_scaling_info scaling_info;
+	struct drm_crtc_state *new_crtc_state;
+	int ret;
+
+	trace_amdgpu_dm_plane_atomic_check(new_plane_state);
+
+	dm_plane_state = to_dm_plane_state(new_plane_state);
+
+	if (!dm_plane_state->dc_state)
+		return 0;
+
+	if (!new_plane_state->crtc || !new_plane_state->state)
+		return -EINVAL;
+
+	new_crtc_state = drm_atomic_get_new_crtc_state(new_plane_state->state,
+						       new_plane_state->crtc);
+	if (!new_crtc_state)
+		return -EINVAL;
+
+	ret = amdgpu_dm_plane_helper_check_state(new_plane_state, new_crtc_state);
+	if (ret)
+		return ret;
+
+	ret = amdgpu_dm_plane_fill_dc_scaling_info(adev, new_plane_state, &scaling_info);
+	if (ret)
+		return ret;
+
+	if (dc_validate_plane(dc, dm_plane_state->dc_state) == DC_OK)
+		return 0;
+
+	return -EINVAL;
+}
+
+static int amdgpu_dm_plane_atomic_async_check(struct drm_plane *plane,
+					      struct drm_plane_state *new_plane_state)
+{
+	struct drm_crtc_state *new_crtc_state;
+	struct dm_crtc_state *dm_new_crtc_state;
+
+	/* Only support async updates on cursor planes. */
+	if (plane->type != DRM_PLANE_TYPE_CURSOR)
+		return -EINVAL;
+
+	if (!new_plane_state->crtc || !new_plane_state->state)
+		return -EINVAL;
+
+	new_crtc_state = drm_atomic_get_new_crtc_state(new_plane_state->state,
+						       new_plane_state->crtc);
+	dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
+	/* Reject overlay cursors for now*/
+	if (dm_new_crtc_state->cursor_mode == DM_CURSOR_OVERLAY_MODE)
+		return -EINVAL;
+
+	return 0;
+}
+#else
 static int amdgpu_dm_plane_atomic_check(struct drm_plane *plane,
 					struct drm_atomic_state *state)
 {
@@ -1280,6 +1395,7 @@ static int amdgpu_dm_plane_atomic_async_check(struct drm_plane *plane,
 
 	return 0;
 }
+#endif
 
 int amdgpu_dm_plane_get_cursor_position(struct drm_plane *plane, struct drm_crtc *crtc,
 					struct dc_cursor_position *position)
@@ -1398,6 +1514,30 @@ void amdgpu_dm_plane_handle_cursor_update(struct drm_plane *plane,
 	}
 }
 
+#ifdef __NetBSD__
+static void amdgpu_dm_plane_atomic_async_update(struct drm_plane *plane,
+						struct drm_plane_state *new_state)
+{
+	trace_amdgpu_dm_atomic_update_cursor(new_state);
+
+	swap(plane->state->fb, new_state->fb);
+
+	plane->state->src_x = new_state->src_x;
+	plane->state->src_y = new_state->src_y;
+	plane->state->src_w = new_state->src_w;
+	plane->state->src_h = new_state->src_h;
+	plane->state->crtc_x = new_state->crtc_x;
+	plane->state->crtc_y = new_state->crtc_y;
+	plane->state->crtc_w = new_state->crtc_w;
+	plane->state->crtc_h = new_state->crtc_h;
+
+	/*
+	 * After the fb swap, new_state holds the previous framebuffer; pass it
+	 * as the old state for cursor programming.
+	 */
+	amdgpu_dm_plane_handle_cursor_update(plane, new_state);
+}
+#else
 static void amdgpu_dm_plane_atomic_async_update(struct drm_plane *plane,
 						struct drm_atomic_state *state)
 {
@@ -1421,7 +1561,9 @@ static void amdgpu_dm_plane_atomic_async_update(struct drm_plane *plane,
 
 	amdgpu_dm_plane_handle_cursor_update(plane, old_state);
 }
+#endif
 
+#ifndef __NetBSD__
 static void amdgpu_dm_plane_panic_flush(struct drm_plane *plane)
 {
 	struct dm_plane_state *dm_plane_state = to_dm_plane_state(plane->state);
@@ -1435,6 +1577,7 @@ static void amdgpu_dm_plane_panic_flush(struct drm_plane *plane)
 
 	dc_plane_force_update_for_panic(dc_plane_state, fb->modifier ? true : false);
 }
+#endif
 
 static const struct drm_plane_helper_funcs dm_plane_helper_funcs = {
 	.prepare_fb = amdgpu_dm_plane_helper_prepare_fb,
@@ -1450,8 +1593,10 @@ static const struct drm_plane_helper_funcs dm_primary_plane_helper_funcs = {
 	.atomic_check = amdgpu_dm_plane_atomic_check,
 	.atomic_async_check = amdgpu_dm_plane_atomic_async_check,
 	.atomic_async_update = amdgpu_dm_plane_atomic_async_update,
+#ifndef __NetBSD__
 	.get_scanout_buffer = amdgpu_display_get_scanout_buffer,
 	.panic_flush = amdgpu_dm_plane_panic_flush,
+#endif
 };
 
 static void amdgpu_dm_plane_drm_plane_reset(struct drm_plane *plane)
@@ -1784,7 +1929,7 @@ dm_atomic_plane_get_property(struct drm_plane *plane,
 static const struct drm_plane_funcs dm_plane_funcs = {
 	.update_plane	= drm_atomic_helper_update_plane,
 	.disable_plane	= drm_atomic_helper_disable_plane,
-	.destroy	= drm_plane_helper_destroy,
+	.destroy	= drm_primary_helper_destroy,
 	.reset = amdgpu_dm_plane_drm_plane_reset,
 	.atomic_duplicate_state = amdgpu_dm_plane_drm_plane_duplicate_state,
 	.atomic_destroy_state = amdgpu_dm_plane_drm_plane_destroy_state,
