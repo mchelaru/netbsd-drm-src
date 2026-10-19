@@ -36,6 +36,11 @@
 #include <linux/amdgpu_netbsd_stubs.h>
 #include <linux/nbsd-namespace.h>
 
+#ifdef __NetBSD__
+/* Escalate after this many soft recoveries within the window. */
+#define AMDGPU_SOFT_RECOVERY_LOOP_MAX		3
+#define AMDGPU_SOFT_RECOVERY_LOOP_WINDOW_MS	60000
+#endif
 
 static void amdgpu_job_do_core_dump(struct amdgpu_device *adev,
 				    struct amdgpu_job *job)
@@ -97,6 +102,9 @@ static enum drm_gpu_sched_stat amdgpu_job_timedout(struct drm_sched_job *s_job)
 	struct amdgpu_device *adev = ring->adev;
 	int idx;
 	int r;
+#ifdef __NetBSD__
+	bool skip_mes_ring_reset = false;
+#endif
 
 	if (!drm_dev_enter(adev_to_drm(adev), &idx)) {
 		dev_info(adev->dev, "%s - device unplugged skipping recovery on scheduler:%s",
@@ -105,6 +113,31 @@ static enum drm_gpu_sched_stat amdgpu_job_timedout(struct drm_sched_job *s_job)
 		/* Effectively the job is aborted as the device is gone */
 		return DRM_GPU_SCHED_STAT_ENODEV;
 	}
+
+#ifdef __NetBSD__
+	/*
+	 * After MODE2 reset, TDR often re-fires with signaled==emitted while
+	 * the HW parent is already signaled.  Another MES ring reset then
+	 * hangs. Instead reap the completed job and do not reset again.
+	 */
+	if (s_job->s_fence->parent &&
+	    dma_fence_is_signaled(s_job->s_fence->parent)) {
+		dev_err(adev->dev,
+		    "ring %s timeout ignored (hw fence already signaled)\n",
+		    s_job->sched->name);
+		if (amdgpu_ring_sched_ready(ring)) {
+			drm_sched_stop(&ring->sched, s_job);
+			drm_sched_start(&ring->sched, 0);
+		}
+		goto exit;
+	}
+
+	/*
+	 * I've disabled soft recovery and MES queue reset hangs here.
+	 * Skip straight to asic reset.
+	 */
+	skip_mes_ring_reset = true;
+#endif
 
 	/*
 	 * Do the coredump immediately after a job timeout to get a very
@@ -117,10 +150,41 @@ static enum drm_gpu_sched_stat amdgpu_job_timedout(struct drm_sched_job *s_job)
 
 	if (amdgpu_gpu_recovery &&
 	    amdgpu_ring_soft_recovery(ring, job->vmid, s_job->s_fence->parent)) {
+#ifdef __NetBSD__
+		ktime_t now = ktime_get();
+
+		if (ring->soft_recovery_streak &&
+		    ktime_ms_delta(now, ring->soft_recovery_last) >
+		    AMDGPU_SOFT_RECOVERY_LOOP_WINDOW_MS)
+			ring->soft_recovery_streak = 0;
+		ring->soft_recovery_streak++;
+		ring->soft_recovery_last = now;
+
+		if (ring->soft_recovery_streak < AMDGPU_SOFT_RECOVERY_LOOP_MAX) {
+			dev_err(adev->dev,
+				"ring %s timeout, but soft recovered (%u/%u)\n",
+				s_job->sched->name, ring->soft_recovery_streak,
+				AMDGPU_SOFT_RECOVERY_LOOP_MAX);
+			goto exit;
+		}
+
+		dev_err(adev->dev,
+			"ring %s soft recovery loop (%u in window), escalating to full reset\n",
+			s_job->sched->name, ring->soft_recovery_streak);
+		ring->soft_recovery_streak = 0;
+		skip_mes_ring_reset = true;
+		drm_sched_wqueue_stop(&ring->sched);
+#else
 		dev_err(adev->dev, "ring %s timeout, but soft recovered\n",
 			s_job->sched->name);
 		goto exit;
+#endif
 	}
+#ifdef __NetBSD__
+	else {
+		ring->soft_recovery_streak = 0;
+	}
+#endif
 
 	dev_err(adev->dev, "ring %s timeout, signaled seq=%u, emitted seq=%u\n",
 		job->base.sched->name, atomic_read(&ring->fence_drv.last_seq),
@@ -138,6 +202,9 @@ static enum drm_gpu_sched_stat amdgpu_job_timedout(struct drm_sched_job *s_job)
 
 	/* attempt a per ring reset */
 	if (amdgpu_gpu_recovery &&
+#ifdef __NetBSD__
+	    !skip_mes_ring_reset &&
+#endif
 	    ring->funcs->reset) {
 		dev_err(adev->dev, "Starting %s ring reset\n", s_job->sched->name);
 		/* stop the scheduler, but don't mess with the
@@ -151,11 +218,18 @@ static enum drm_gpu_sched_stat amdgpu_job_timedout(struct drm_sched_job *s_job)
 				drm_sched_stop(&ring->sched, s_job);
 			atomic_inc(&ring->adev->gpu_reset_counter);
 			amdgpu_fence_driver_force_completion(ring);
+#ifdef __NetBSD__
+			ring->soft_recovery_streak = 0;
+#endif
 			if (amdgpu_ring_sched_ready(ring))
 				drm_sched_start(&ring->sched, 0);
 			goto exit;
 		}
 		dev_err(adev->dev, "Ring %s reset failure\n", ring->sched.name);
+#ifdef __NetBSD__
+	} else if (amdgpu_gpu_recovery && skip_mes_ring_reset) {
+		drm_sched_wqueue_stop(&ring->sched);
+#endif
 	}
 
 	if (amdgpu_device_should_recover_gpu(ring->adev)) {
@@ -165,7 +239,14 @@ static enum drm_gpu_sched_stat amdgpu_job_timedout(struct drm_sched_job *s_job)
 		reset_context.method = AMD_RESET_METHOD_NONE;
 		reset_context.reset_req_dev = adev;
 		reset_context.src = AMDGPU_RESET_SRC_JOB;
+#ifdef __NetBSD__
+		if (skip_mes_ring_reset)
+			set_bit(AMDGPU_NEED_FULL_RESET, &reset_context.flags);
+		else
+			clear_bit(AMDGPU_NEED_FULL_RESET, &reset_context.flags);
+#else
 		clear_bit(AMDGPU_NEED_FULL_RESET, &reset_context.flags);
+#endif
 
 		/*
 		 * To avoid an unnecessary extra coredump, as we have already
@@ -174,6 +255,9 @@ static enum drm_gpu_sched_stat amdgpu_job_timedout(struct drm_sched_job *s_job)
 		set_bit(AMDGPU_SKIP_COREDUMP, &reset_context.flags);
 
 		r = amdgpu_device_gpu_recover(ring->adev, job, &reset_context);
+#ifdef __NetBSD__
+		ring->soft_recovery_streak = 0;
+#endif
 		if (r)
 			dev_err(adev->dev, "GPU Recovery Failed: %d\n", r);
 	} else {

@@ -480,7 +480,10 @@ bool amdgpu_ring_soft_recovery(struct amdgpu_ring *ring, unsigned int vmid,
 	unsigned long flags;
 	ktime_t deadline;
 
+#ifndef __NetBSD__
+	/* TODO */
 	if (unlikely(ring->adev->debug_disable_soft_recovery))
+#endif
 		return false;
 
 	deadline = ktime_add_us(ktime_get(), 10000);
