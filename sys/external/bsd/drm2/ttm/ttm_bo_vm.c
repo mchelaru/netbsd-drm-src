@@ -128,10 +128,12 @@ ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo, struct uvm_faultinfo *vmf)
 	 */
 	ttm_bo_get(bo);
 	uvmfault_unlockall(vmf, vmf->entry->aref.ar_amap, NULL);
-	(void)dma_resv_wait_timeout(bo->base.resv, DMA_RESV_USAGE_KERNEL,
-	    true, MAX_SCHEDULE_TIMEOUT);
+	long wait = dma_resv_wait_timeout(bo->base.resv,
+	    DMA_RESV_USAGE_KERNEL, true, 10 * HZ); /* 10sec */
 	dma_resv_unlock(bo->base.resv);
 	ttm_bo_put(bo);
+	if (wait == 0)
+		return ETIMEDOUT;
 	return ERESTART;
 }
 
@@ -292,6 +294,8 @@ ttm_bo_uvm_fault(struct uvm_faultinfo *vmf, vaddr_t vaddr,
 	    access_type, flags);
 	if (ret == ERESTART)	/* already unlocked on ERESTART */
 		return ret;
+	if (ret == ETIMEDOUT)	/* already unlocked; GPU wait timed out */
+		return EINVAL;	/* SIGBUS */
 
 	dma_resv_unlock(bo->base.resv);
 
