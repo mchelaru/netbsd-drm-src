@@ -39,6 +39,7 @@ SRCS+=	linux_hrtimer.c
 SRCS+=	linux_hdmi.c
 SRCS+=	linux_i2c.c
 SRCS+=	linux_idr.c
+SRCS+=	linux_ioremap.c
 SRCS+=	linux_irq_work.c
 SRCS+=	linux_kmap.c
 SRCS+=	linux_kthread.c

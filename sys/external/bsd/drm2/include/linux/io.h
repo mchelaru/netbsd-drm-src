@@ -55,35 +55,12 @@ void	arch_io_free_memtype_wc(resource_size_t, resource_size_t);
 
 #include <linux/memremap.h>
 
-/*
- * Minimal ioremap stubs.  Real device MMIO mapping goes through
- * bus_space / drm bus glue; these exist so TTM's optional linear I/O
- * map helpers can compile.
- */
-static inline void *
-ioremap(resource_size_t offset, unsigned long size)
-{
-	(void)offset;
-	(void)size;
-	return NULL;
-}
+void	*ioremap(resource_size_t, unsigned long);
+void	*ioremap_wc(resource_size_t, unsigned long);
+void	*ioremap_cache(resource_size_t, unsigned long);
+void	iounmap(volatile void *);
 
-static inline void *
-ioremap_wc(resource_size_t offset, unsigned long size)
-{
-	return ioremap(offset, size);
-}
-
-static inline void *
-ioremap_cache(resource_size_t offset, unsigned long size)
-{
-	return ioremap(offset, size);
-}
-
-static inline void
-iounmap(volatile void *addr)
-{
-	(void)addr;
-}
+void	linux_ioremap_init(void);
+void	linux_ioremap_fini(void);
 
 #endif  /* _LINUX_IO_H_ */

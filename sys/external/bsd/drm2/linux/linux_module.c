@@ -71,6 +71,8 @@ linux_init(void)
 		goto fail0a;
 	}
 
+	linux_ioremap_init();
+
 	error = linux_kmap_init();
 	if (error) {
 		printf("linux: unable to initialize kmap: %d\n", error);
@@ -134,7 +136,8 @@ fail5:	linux_writecomb_fini();
 fail4:	linux_workqueue_fini();
 fail3:	linux_rcu_gc_fini();
 fail2:	linux_kmap_fini();
-fail1:	linux_set_memory_fini();
+fail1:	linux_ioremap_fini();
+	linux_set_memory_fini();
 fail0a:	linux_idr_module_fini();
 fail0:	return error;
 }
@@ -166,6 +169,7 @@ linux_fini(void)
 	linux_workqueue_fini();
 	linux_rcu_gc_fini();
 	linux_kmap_fini();
+	linux_ioremap_fini();
 	linux_set_memory_fini();
 	linux_idr_module_fini();
 }
