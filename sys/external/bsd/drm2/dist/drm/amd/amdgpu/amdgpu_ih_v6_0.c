@@ -438,7 +438,7 @@ static u32 ih_v6_0_get_wptr(struct amdgpu_device *adev,
 	u32 wptr, tmp;
 	struct amdgpu_ih_regs *ih_regs;
 
-	wptr = le32_to_cpu(*ih->wptr_cpu);
+	wptr = amdgpu_wb_r32(ih->wptr_cpu);
 	ih_regs = &ih->ih_regs;
 
 	if (!REG_GET_FIELD(wptr, IH_RB_WPTR, RB_OVERFLOW))
@@ -513,7 +513,7 @@ static void ih_v6_0_set_rptr(struct amdgpu_device *adev,
 
 	if (ih->use_doorbell) {
 		/* XXX check if swapping is necessary on BE */
-		*ih->rptr_cpu = ih->rptr;
+		amdgpu_wb_w32(ih->rptr_cpu, ih->rptr);
 		WDOORBELL32(ih->doorbell_index, ih->rptr);
 
 		if (amdgpu_sriov_vf(adev))

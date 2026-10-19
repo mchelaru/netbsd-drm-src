@@ -36,6 +36,7 @@
 #include <linux/firmware.h>
 #include <linux/pm_runtime.h>
 
+#include <drm/drm_cache.h>
 #include <drm/drm_drv.h>
 #include "amdgpu.h"
 #include "amdgpu_trace.h"
@@ -105,7 +106,7 @@ static void amdgpu_fence_write(struct amdgpu_ring *ring, u32 seq)
 	struct amdgpu_fence_driver *drv = &ring->fence_drv;
 
 	if (drv->cpu_addr)
-		*drv->cpu_addr = cpu_to_le32(seq);
+		amdgpu_wb_w32(drv->cpu_addr, seq);
 }
 
 /**
@@ -122,7 +123,7 @@ static u32 amdgpu_fence_read(struct amdgpu_ring *ring)
 	u32 seq = 0;
 
 	if (drv->cpu_addr)
-		seq = le32_to_cpu(*drv->cpu_addr);
+		seq = amdgpu_wb_r32(drv->cpu_addr);
 	else
 		seq = atomic_read(&drv->last_seq);
 

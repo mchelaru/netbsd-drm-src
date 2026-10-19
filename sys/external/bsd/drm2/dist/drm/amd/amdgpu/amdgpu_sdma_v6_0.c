@@ -216,6 +216,7 @@ static void sdma_v6_0_ring_set_wptr(struct amdgpu_ring *ring)
 		/* XXX check if swapping is necessary on BE */
 		atomic64_set((atomic64_t *)ring->wptr_cpu_addr,
 			     ring->wptr << 2);
+		amdgpu_clflush_ptr(ring->wptr_cpu_addr, sizeof(uint64_t));
 		DRM_DEBUG("calling WDOORBELL64(0x%08x, 0x%016"PRIx64")\n",
 			  ring->doorbell_index, ring->wptr << 2);
 		WDOORBELL64(ring->doorbell_index, ring->wptr << 2);
@@ -928,6 +929,10 @@ static int sdma_v6_0_ring_test_ring(struct amdgpu_ring *ring)
 		gpu_addr = amdgpu_mes_ctx_get_offs_gpu_addr(ring, offset);
 		cpu_ptr = amdgpu_mes_ctx_get_offs_cpu_addr(ring, offset);
 		*cpu_ptr = tmp;
+#ifdef __NetBSD__
+		drm_clflush_virt_range(__UNVOLATILE(cpu_ptr), sizeof(*cpu_ptr));
+		mb();
+#endif
 	} else {
 		r = amdgpu_device_wb_get(adev, &index);
 		if (r) {
@@ -937,6 +942,15 @@ static int sdma_v6_0_ring_test_ring(struct amdgpu_ring *ring)
 
 		gpu_addr = adev->wb.gpu_addr + (index * 4);
 		adev->wb.wb[index] = cpu_to_le32(tmp);
+#ifdef __NetBSD__
+		/*
+		 * WB GTT may still be reachable via a WB alias.  Push the
+		 * seed value and invalidate before polling GPU writes.
+		 */
+		drm_clflush_virt_range(__UNVOLATILE(&adev->wb.wb[index]),
+				       sizeof(adev->wb.wb[index]));
+		mb();
+#endif
 	}
 
 	r = amdgpu_ring_alloc(ring, 5);
@@ -956,6 +970,14 @@ static int sdma_v6_0_ring_test_ring(struct amdgpu_ring *ring)
 	amdgpu_ring_commit(ring);
 
 	for (i = 0; i < adev->usec_timeout; i++) {
+#ifdef __NetBSD__
+		if (ring->is_mes_queue)
+			drm_clflush_virt_range(__UNVOLATILE(cpu_ptr),
+					       sizeof(*cpu_ptr));
+		else
+			drm_clflush_virt_range(__UNVOLATILE(&adev->wb.wb[index]),
+					       sizeof(adev->wb.wb[index]));
+#endif
 		if (ring->is_mes_queue)
 			tmp = le32_to_cpu(*cpu_ptr);
 		else
@@ -1011,6 +1033,10 @@ static int sdma_v6_0_ring_test_ib(struct amdgpu_ring *ring, long timeout)
 		gpu_addr = amdgpu_mes_ctx_get_offs_gpu_addr(ring, offset);
 		cpu_ptr = amdgpu_mes_ctx_get_offs_cpu_addr(ring, offset);
 		*cpu_ptr = tmp;
+#ifdef __NetBSD__
+		drm_clflush_virt_range(__UNVOLATILE(cpu_ptr), sizeof(*cpu_ptr));
+		mb();
+#endif
 	} else {
 		r = amdgpu_device_wb_get(adev, &index);
 		if (r) {
@@ -1020,6 +1046,11 @@ static int sdma_v6_0_ring_test_ib(struct amdgpu_ring *ring, long timeout)
 
 		gpu_addr = adev->wb.gpu_addr + (index * 4);
 		adev->wb.wb[index] = cpu_to_le32(tmp);
+#ifdef __NetBSD__
+		drm_clflush_virt_range(__UNVOLATILE(&adev->wb.wb[index]),
+				       sizeof(adev->wb.wb[index]));
+		mb();
+#endif
 
 		r = amdgpu_ib_get(adev, NULL, 256, AMDGPU_IB_POOL_DIRECT, &ib);
 		if (r) {
@@ -1053,6 +1084,13 @@ static int sdma_v6_0_ring_test_ib(struct amdgpu_ring *ring, long timeout)
 		goto err1;
 	}
 
+#ifdef __NetBSD__
+	if (ring->is_mes_queue)
+		drm_clflush_virt_range(__UNVOLATILE(cpu_ptr), sizeof(*cpu_ptr));
+	else
+		drm_clflush_virt_range(__UNVOLATILE(&adev->wb.wb[index]),
+				       sizeof(adev->wb.wb[index]));
+#endif
 	if (ring->is_mes_queue)
 		tmp = le32_to_cpu(*cpu_ptr);
 	else
@@ -1488,7 +1526,7 @@ static int sdma_v6_0_ring_preempt_ib(struct amdgpu_ring *ring)
 	/* poll the trailing fence */
 	for (i = 0; i < adev->usec_timeout; i++) {
 		if (ring->trail_seq ==
-		    le32_to_cpu(*(ring->trail_fence_cpu_addr)))
+		    amdgpu_wb_r32(ring->trail_fence_cpu_addr))
 			break;
 		udelay(1);
 	}

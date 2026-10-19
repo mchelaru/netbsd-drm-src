@@ -543,6 +543,53 @@ struct amdgpu_wb {
 int amdgpu_device_wb_get(struct amdgpu_device *adev, u32 *wb);
 void amdgpu_device_wb_free(struct amdgpu_device *adev, u32 wb);
 
+#ifdef __NetBSD__
+#include <drm/drm_cache.h>
+/*
+ * GTT/WB may still be reachable via a WB alias on NetBSD.  Flush before the
+ * GPU consumes a CPU store, and invalidate before the CPU polls a GPU store.
+ */
+static inline void
+amdgpu_clflush_ptr(const volatile void *p, size_t len)
+{
+	drm_clflush_virt_range(__UNVOLATILE(p), len);
+	mb();
+}
+
+static inline u32
+amdgpu_wb_r32(const volatile uint32_t *p)
+{
+	amdgpu_clflush_ptr(p, sizeof(*p));
+	return le32_to_cpu(*p);
+}
+
+static inline void
+amdgpu_wb_w32(volatile uint32_t *p, u32 v)
+{
+	*p = cpu_to_le32(v);
+	amdgpu_clflush_ptr(p, sizeof(*p));
+}
+#else
+static inline void
+amdgpu_clflush_ptr(const volatile void *p, size_t len)
+{
+	(void)p;
+	(void)len;
+}
+
+static inline u32
+amdgpu_wb_r32(const volatile uint32_t *p)
+{
+	return le32_to_cpu(*p);
+}
+
+static inline void
+amdgpu_wb_w32(volatile uint32_t *p, u32 v)
+{
+	*p = cpu_to_le32(v);
+}
+#endif
+
 /*
  * Benchmarking
  */

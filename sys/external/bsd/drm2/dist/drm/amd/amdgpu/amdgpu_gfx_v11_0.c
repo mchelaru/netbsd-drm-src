@@ -575,15 +575,15 @@ static int gfx_v11_0_ring_test_ib(struct amdgpu_ring *ring, long timeout)
 
 		gpu_addr = amdgpu_mes_ctx_get_offs_gpu_addr(ring, padding);
 		cpu_ptr = amdgpu_mes_ctx_get_offs_cpu_addr(ring, padding);
-		*cpu_ptr = cpu_to_le32(0xCAFEDEAD);
+		amdgpu_wb_w32(cpu_ptr, 0xCAFEDEAD);
 	} else {
 		r = amdgpu_device_wb_get(adev, &index);
 		if (r)
 			return r;
 
 		gpu_addr = adev->wb.gpu_addr + (index * 4);
-		adev->wb.wb[index] = cpu_to_le32(0xCAFEDEAD);
 		cpu_ptr = &adev->wb.wb[index];
+		amdgpu_wb_w32(cpu_ptr, 0xCAFEDEAD);
 
 		r = amdgpu_ib_get(adev, NULL, 20, AMDGPU_IB_POOL_DIRECT, &ib);
 		if (r) {
@@ -611,7 +611,7 @@ static int gfx_v11_0_ring_test_ib(struct amdgpu_ring *ring, long timeout)
 		goto err2;
 	}
 
-	if (le32_to_cpu(*cpu_ptr) == 0xDEADBEEF)
+	if (amdgpu_wb_r32(cpu_ptr) == 0xDEADBEEF)
 		r = 0;
 	else
 		r = -EINVAL;
@@ -5601,6 +5601,7 @@ static void gfx_v11_0_ring_set_wptr_gfx(struct amdgpu_ring *ring)
 		/* XXX check if swapping is necessary on BE */
 		atomic64_set((atomic64_t *)ring->wptr_cpu_addr,
 			     ring->wptr);
+		amdgpu_clflush_ptr(ring->wptr_cpu_addr, sizeof(uint64_t));
 		WDOORBELL64(ring->doorbell_index, ring->wptr);
 	} else {
 		WREG32_SOC15(GC, 0, regCP_RB0_WPTR,
@@ -5636,6 +5637,7 @@ static void gfx_v11_0_ring_set_wptr_compute(struct amdgpu_ring *ring)
 	if (ring->use_doorbell) {
 		atomic64_set((atomic64_t *)ring->wptr_cpu_addr,
 			     ring->wptr);
+		amdgpu_clflush_ptr(ring->wptr_cpu_addr, sizeof(uint64_t));
 		WDOORBELL64(ring->doorbell_index, ring->wptr);
 	} else {
 		BUG(); /* only DOORBELL method supported on gfx11 now */
@@ -6018,7 +6020,7 @@ static int gfx_v11_0_ring_preempt_ib(struct amdgpu_ring *ring)
 	/* poll the trailing fence */
 	for (i = 0; i < adev->usec_timeout; i++) {
 		if (ring->trail_seq ==
-		    le32_to_cpu(*(ring->trail_fence_cpu_addr)))
+		    amdgpu_wb_r32(ring->trail_fence_cpu_addr))
 			break;
 		udelay(1);
 	}

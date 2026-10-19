@@ -267,6 +267,8 @@ void amdgpu_ih_decode_iv_helper(struct amdgpu_device *adev,
 	u32 ring_index = ih->rptr >> 2;
 	uint32_t dw[8];
 
+	/* GPU-written IV; invalidate before CPU decode. */
+	amdgpu_clflush_ptr(&ih->ring[ring_index], 8 * sizeof(ih->ring[0]));
 	dw[0] = le32_to_cpu(ih->ring[ring_index + 0]);
 	dw[1] = le32_to_cpu(ih->ring[ring_index + 1]);
 	dw[2] = le32_to_cpu(ih->ring[ring_index + 2]);
@@ -304,6 +306,7 @@ uint64_t amdgpu_ih_decode_iv_ts_helper(struct amdgpu_ih_ring *ih, u32 rptr,
 	rptr += iv_size * offset;
 	ring_index = (rptr & ih->ptr_mask) >> 2;
 
+	amdgpu_clflush_ptr(&ih->ring[ring_index + 1], 2 * sizeof(ih->ring[0]));
 	dw1 = le32_to_cpu(ih->ring[ring_index + 1]);
 	dw2 = le32_to_cpu(ih->ring[ring_index + 2]);
 	return dw1 | ((u64)(dw2 & 0xffff) << 32);
