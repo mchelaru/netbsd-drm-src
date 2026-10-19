@@ -2064,10 +2064,14 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 		} else if (map_size) {
 			bus_addr_t aper_bus;
 
+			/*
+			 * Linux ioremap_wc()s BAR0.  PREFETCHABLE selects
+			 * PMAP_WRITE_COMBINE - see sys/arch/x86/x86/bus_space.c
+			 */
 			if (pci_mapreg_map(&adev->pdev->pd_pa, PCI_BAR(0),
 			    pci_mapreg_type(adev->pdev->pd_pa.pa_pc,
 				adev->pdev->pd_pa.pa_tag, PCI_BAR(0)),
-			    0,
+			    BUS_SPACE_MAP_PREFETCHABLE,
 			    &adev->mman.aper_bst, &adev->mman.aper_bsh,
 			    &aper_bus, &adev->mman.aper_map_size)) {
 				DRM_ERROR("failed to map VRAM aperture (BAR0)\n");
