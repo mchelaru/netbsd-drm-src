@@ -6052,6 +6052,139 @@ x86_mmap_flags(paddr_t mdpgno)
 	return pflag;
 }
 
+/*
+ * pmap_page_set_memattr: set PAT/cache mode on the direct-map PTE for pa.
+ * flags is e.g. PMAP_WRITE_COMBINE, PMAP_NOCACHE, PMAP_WRITE_BACK.
+ *
+ * NB: Demote to 4K PTEs when needed. Demoting a DMAP 2MB page retouches
+ * TLB state for 511 neighbouring physical pages.
+ */
+
+int
+pmap_page_set_memattr(paddr_t pa, u_int flags)
+{
+#if defined(__HAVE_DIRECT_MAP) && defined(__x86_64__) && !defined(XENPV)
+	vaddr_t va;
+	pd_entry_t pde, npde;
+	pt_entry_t *ptep, opte, npte, proto;
+	pt_entry_t cachebits;
+	struct vm_page *ptp = NULL;
+	paddr_t ptp_pa, base_pa;
+	unsigned i;
+
+	pa = trunc_page(pa);
+	va = PMAP_DIRECT_MAP(pa);
+	if (va < PMAP_DIRECT_BASE || va >= PMAP_DIRECT_END)
+		return ENOENT;
+
+	cachebits = pmap_pat_flags(flags & PMAP_CACHE_MASK);
+
+	pde = L2_BASE[pl2_i(va)];
+	if (!pmap_valid_entry(pde))
+		return ENOENT;
+
+	if (pde & PTE_PS) {
+		/*
+		 * large page size, we dance here because uvm_pagealloc
+		 * cannot be called with kpreempt_disable
+		 */
+		ptp = uvm_pagealloc(NULL, 0, NULL,
+		    UVM_PGA_USERESERVE | UVM_PGA_ZERO);
+		if (ptp == NULL)
+			return ENOMEM;
+		ptp->flags &= ~PG_BUSY;
+		ptp->wire_count = 1;
+		ptp_pa = VM_PAGE_TO_PHYS(ptp);
+	}
+
+	kpreempt_disable();
+
+	pde = L2_BASE[pl2_i(va)];
+	if (!pmap_valid_entry(pde)) {
+		kpreempt_enable();
+		if (ptp != NULL)
+			uvm_pagefree(ptp);
+		return ENOENT;
+	}
+
+	if (pde & PTE_PS) {
+		pt_entry_t *ptps;
+
+		if (ptp == NULL) {
+			/*
+			 * Raced: large page appeared after our check.
+			 * Retrying would need another kpreempt_enable
+			 * and alloc, let the caller do that.
+			 */
+			kpreempt_enable();
+			return EAGAIN;
+		}
+
+		base_pa = pde & PTE_LGFRAME;
+		proto = pde & (PTE_P | PTE_W | PTE_U | PTE_PWT | PTE_PCD |
+		    PTE_A | PTE_D | PTE_G | PTE_NX);
+		if (pde & PTE_LGPAT)
+			proto |= PTE_PAT;
+
+		ptps = (pt_entry_t *)PMAP_DIRECT_MAP(ptp_pa);
+		for (i = 0; i < (NBPD_L2 / PAGE_SIZE); i++) {
+			ptps[i] = (base_pa + ((paddr_t)i << PAGE_SHIFT)) |
+			    proto | PTE_P;
+		}
+
+		npde = (ptp_pa & PTE_FRAME) | PTE_P | PTE_W | PTE_A |
+		    (pde & PTE_NX);
+		if (pmap_pte_cas(&L2_BASE[pl2_i(va)], pde, npde) != pde) {
+			/* Raced again, another CPU demoted */
+			kpreempt_enable();
+			uvm_pagefree(ptp);
+			ptp = NULL;
+			kpreempt_disable();
+			pde = L2_BASE[pl2_i(va)];
+			if (!pmap_valid_entry(pde) || (pde & PTE_PS)) {
+				kpreempt_enable();
+				return EAGAIN;
+			}
+		} else {
+			pmap_pte_flush();
+			pmap_tlb_shootdown(pmap_kernel(), (vaddr_t)-1, PTE_G,
+			    TLBSHOOT_KENTER);
+			pmap_tlb_shootnow();
+			ptp = NULL; /* installed */
+			pmap_stats_update(pmap_kernel(), 1, 0);
+		}
+	} else if (ptp != NULL) {
+		/* large page size no more */
+		kpreempt_enable();
+		uvm_pagefree(ptp);
+		ptp = NULL;
+		kpreempt_disable();
+	}
+
+	ptep = &L1_BASE[pl1_i(va)];
+	opte = *ptep;
+	if (!pmap_valid_entry(opte)) {
+		kpreempt_enable();
+		return ENOENT;
+	}
+
+	npte = (opte & ~(PTE_PWT | PTE_PCD | PTE_PAT)) | cachebits;
+	if (npte != opte) {
+		pmap_pte_set(ptep, npte);
+		pmap_pte_flush();
+		pmap_tlb_shootdown(pmap_kernel(), va, opte, TLBSHOOT_KENTER);
+		pmap_tlb_shootnow();
+	}
+
+	kpreempt_enable();
+	return 0;
+#else
+	(void)pa;
+	(void)flags;
+	return ENOTSUP;
+#endif
+}
+
 #if defined(__HAVE_DIRECT_MAP) && defined(__x86_64__) && !defined(XENPV)
 
 /*

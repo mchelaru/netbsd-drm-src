@@ -202,6 +202,8 @@ bool	pmap_extract_ma(pmap_t, vaddr_t, paddr_t *);
 
 paddr_t pmap_get_physpage(void);
 
+int	pmap_page_set_memattr(paddr_t, u_int);
+
 /*
  * Hooks for the pool allocator.
  */

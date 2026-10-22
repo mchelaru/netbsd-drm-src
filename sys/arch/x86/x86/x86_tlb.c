@@ -254,7 +254,11 @@ pmap_tlb_shootdown(struct pmap *pm, vaddr_t va, pt_entry_t pte, tlbwhy_t why)
 	}
 
 	if ((pte & PTE_PS) != 0) {
-		va &= PTE_LGFRAME;
+		/*
+		 * switched from PTE_LGFRAME because it masks the
+		 * upper 3 bits
+		 */
+		va &= ~(NBPD_L2 - 1);
 	}
 
 	/*
