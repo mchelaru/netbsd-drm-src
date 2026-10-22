@@ -121,11 +121,8 @@ static int amdgpu_vm_sdma_commit(struct amdgpu_vm_update_params *p,
 		atomic64_inc(&p->vm->tlb_seq);
 
 	WARN_ON(ib->length_dw > p->num_dw_left);
-#ifdef __NetBSD__
-	/* See amdgpu_ib_schedule: WB IB must hit DRAM before SDMA fetches. */
-	if (ib->ptr && ib->length_dw)
-		drm_clflush_virt_range(ib->ptr, ib->length_dw * 4);
-#endif
+	/* drain WC before SDMA fetches */
+	amdgpu_wc_wmb();
 	f = amdgpu_job_submit(p->job);
 
 	if (p->unlocked) {

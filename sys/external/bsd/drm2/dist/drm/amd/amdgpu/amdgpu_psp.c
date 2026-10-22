@@ -684,12 +684,8 @@ psp_cmd_submit_buf(struct psp_context *psp,
 
 	memcpy(psp->cmd_buf_mem, cmd, sizeof(struct psp_gfx_cmd_resp));
 #ifdef __NetBSD__
-	/*
-	 * cmd/fence BOs are USWC on NetBSD.  Drain WC buffers so PSP sees
-	 * the command; clflush fence lines before polling PSP completions.
-	 */
-	drm_clflush_virt_range(psp->cmd_buf_mem, PSP_CMD_BUFFER_SIZE);
-	mb();
+	/* cmd BO is USWC; drain WC so PSP sees the command. */
+	amdgpu_wc_wmb();
 #endif
 
 	index = atomic_inc_return(&psp->fence_value);
@@ -701,9 +697,7 @@ psp_cmd_submit_buf(struct psp_context *psp,
 
 	amdgpu_device_invalidate_hdp(psp->adev, NULL);
 	for (;;) {
-#ifdef __NetBSD__
-		drm_clflush_virt_range(psp->fence_buf, sizeof(unsigned int));
-#endif
+		/* USWC fence: plain poll, no clflush. */
 		if (*((unsigned int *)psp->fence_buf) == index)
 			break;
 		if (--timeout == 0)
@@ -724,9 +718,6 @@ psp_cmd_submit_buf(struct psp_context *psp,
 	skip_unsupport = (psp->cmd_buf_mem->resp.status == TEE_ERROR_NOT_SUPPORTED ||
 		psp->cmd_buf_mem->resp.status == PSP_ERR_UNKNOWN_COMMAND) && amdgpu_sriov_vf(psp->adev);
 
-#ifdef __NetBSD__
-	drm_clflush_virt_range(psp->cmd_buf_mem, PSP_CMD_BUFFER_SIZE);
-#endif
 	memcpy(&cmd->resp, &psp->cmd_buf_mem->resp, sizeof(struct psp_gfx_resp));
 
 	/* In some cases, psp response status is not 0 even there is no
@@ -3310,10 +3301,7 @@ int psp_ring_cmd_submit(struct psp_context *psp,
 	write_frame->fence_addr_hi = upper_32_bits(fence_mc_addr);
 	write_frame->fence_addr_lo = lower_32_bits(fence_mc_addr);
 	write_frame->fence_value = index;
-#ifdef __NetBSD__
-	drm_clflush_virt_range(write_frame, sizeof(*write_frame));
-	mb();
-#endif
+	amdgpu_wc_wmb();
 	amdgpu_device_flush_hdp(adev, NULL);
 
 	/* Update the write Pointer in DWORDs */
@@ -3926,11 +3914,7 @@ void psp_copy_fw(struct psp_context *psp, uint8_t *start_addr, uint32_t bin_size
 
 	memset(psp->fw_pri_buf, 0, PSP_1_MEG);
 	memcpy(psp->fw_pri_buf, start_addr, bin_size);
-#ifdef __NetBSD__
-	/* USWC pri buffer: push TOC/ucode to DRAM before PSP DMA. */
-	drm_clflush_virt_range(psp->fw_pri_buf, PSP_1_MEG);
-	mb();
-#endif
+	amdgpu_wc_wmb();
 
 	drm_dev_exit(idx);
 }

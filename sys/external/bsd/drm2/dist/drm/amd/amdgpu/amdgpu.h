@@ -544,22 +544,23 @@ int amdgpu_device_wb_get(struct amdgpu_device *adev, u32 *wb);
 void amdgpu_device_wb_free(struct amdgpu_device *adev, u32 wb);
 
 #ifdef __NetBSD__
-#include <drm/drm_cache.h>
-/*
- * GTT/WB may still be reachable via a WB alias on NetBSD.  Flush before the
- * GPU consumes a CPU store, and invalidate before the CPU polls a GPU store.
- */
+#if defined(__i386__) || defined(__x86_64__)
+#include <machine/cpufunc.h>
+#endif
+
 static inline void
-amdgpu_clflush_ptr(const volatile void *p, size_t len)
+amdgpu_wc_wmb(void)
 {
-	drm_clflush_virt_range(__UNVOLATILE(p), len);
+#if defined(__i386__) || defined(__x86_64__)
+	x86_sfence();
+#else
 	mb();
+#endif
 }
 
 static inline u32
 amdgpu_wb_r32(const volatile uint32_t *p)
 {
-	amdgpu_clflush_ptr(p, sizeof(*p));
 	return le32_to_cpu(*p);
 }
 
@@ -567,14 +568,12 @@ static inline void
 amdgpu_wb_w32(volatile uint32_t *p, u32 v)
 {
 	*p = cpu_to_le32(v);
-	amdgpu_clflush_ptr(p, sizeof(*p));
+	amdgpu_wc_wmb();
 }
 #else
 static inline void
-amdgpu_clflush_ptr(const volatile void *p, size_t len)
+amdgpu_wc_wmb(void)
 {
-	(void)p;
-	(void)len;
 }
 
 static inline u32

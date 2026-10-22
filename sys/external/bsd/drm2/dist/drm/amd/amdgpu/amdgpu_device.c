@@ -1592,11 +1592,7 @@ static int amdgpu_device_wb_init(struct amdgpu_device *adev)
 
 		/* clear wb memory */
 		memset(__UNVOLATILE(adev->wb.wb), 0, AMDGPU_MAX_WB * sizeof(uint32_t) * 8);
-#ifdef __NetBSD__
-		drm_clflush_virt_range(__UNVOLATILE(adev->wb.wb),
-				       AMDGPU_MAX_WB * sizeof(uint32_t) * 8);
-		mb();
-#endif
+		amdgpu_wc_wmb();
 	}
 
 	return 0;

@@ -5601,7 +5601,7 @@ static void gfx_v11_0_ring_set_wptr_gfx(struct amdgpu_ring *ring)
 		/* XXX check if swapping is necessary on BE */
 		atomic64_set((atomic64_t *)ring->wptr_cpu_addr,
 			     ring->wptr);
-		amdgpu_clflush_ptr(ring->wptr_cpu_addr, sizeof(uint64_t));
+		amdgpu_wc_wmb();
 		WDOORBELL64(ring->doorbell_index, ring->wptr);
 	} else {
 		WREG32_SOC15(GC, 0, regCP_RB0_WPTR,
@@ -5637,7 +5637,7 @@ static void gfx_v11_0_ring_set_wptr_compute(struct amdgpu_ring *ring)
 	if (ring->use_doorbell) {
 		atomic64_set((atomic64_t *)ring->wptr_cpu_addr,
 			     ring->wptr);
-		amdgpu_clflush_ptr(ring->wptr_cpu_addr, sizeof(uint64_t));
+		amdgpu_wc_wmb();
 		WDOORBELL64(ring->doorbell_index, ring->wptr);
 	} else {
 		BUG(); /* only DOORBELL method supported on gfx11 now */

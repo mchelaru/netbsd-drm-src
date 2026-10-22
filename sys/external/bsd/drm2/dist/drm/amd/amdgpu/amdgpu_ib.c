@@ -234,15 +234,8 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned int num_ibs,
 						       ring->cond_exe_gpu_addr);
 
 #ifdef __NetBSD__
-	/*
-	 * IB pool memory is GTT; CP/SDMA fetch IBs from memory.  Without a
-	 * clflush WB cachelines will stay dirty and GPU will see garbage
-	 */
-	for (i = 0; i < num_ibs; i++) {
-		if (ibs[i].ptr && ibs[i].length_dw)
-			drm_clflush_virt_range(ibs[i].ptr,
-			    ibs[i].length_dw * 4);
-	}
+	/* IB pool is USWC; drain WC buffers before CP/SDMA fetch. */
+	amdgpu_wc_wmb();
 #endif
 	amdgpu_device_flush_hdp(adev, ring);
 

@@ -272,9 +272,8 @@ int amdgpu_bo_create_reserved(struct amdgpu_device *adev,
 #ifdef __NetBSD__
 	/*
 	 * Rings, fence WB, and IB pools are GTT kernel BOs the GPU writes and
-	 * the CPU polls. NetBSD cannot flip the amd64 direct map to WC, so
-	 * unmarked pages stay WB there and GPU writebacks are invisible.
-	 * USWC records the paddr and forces kmap/vmap off the WB alias.
+	 * the CPU polls.  Mark USWC so TTM CPA's the DMAP PTE to WC
+	 * (see linux_set_memory.c); otherwise the pages stay WB-cached.
 	 */
 	if (cpu_addr && (domain & AMDGPU_GEM_DOMAIN_GTT))
 		bp.flags |= AMDGPU_GEM_CREATE_CPU_GTT_USWC;
