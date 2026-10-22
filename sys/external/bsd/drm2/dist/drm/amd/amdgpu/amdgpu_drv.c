@@ -1091,7 +1091,6 @@ module_param_named(wbrf, amdgpu_wbrf, int, 0444);
 /* These devices are not supported by amdgpu.
  * They are supported by the mach64, r128, radeon drivers
  */
-#ifndef __NetBSD__
 static const u16 amdgpu_unsupported_pciidlist[] = {
 	/* mach64 */
 	0x4354,
@@ -1800,7 +1799,6 @@ static const u16 amdgpu_unsupported_pciidlist[] = {
 	0x72b3,
 	0x793f,
 };
-#endif /* !__NetBSD__ */
 
 static const struct pci_device_id pciidlist[] = {
 #ifdef CONFIG_DRM_AMDGPU_SI
@@ -2149,20 +2147,6 @@ static const struct pci_device_id pciidlist[] = {
 	{0x1002, 0x7423, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_BEIGE_GOBY},
 	{0x1002, 0x7424, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_BEIGE_GOBY},
 	{0x1002, 0x743F, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_BEIGE_GOBY},
-
-	/*
-	 * Phoenix / Hawk Point APUs (XXX: matched explicitly for NetBSD: the
-	 * CHIP_IP_DISCOVERY catch-alls below use PCI_ANY_ID + class, which
-	 * NetBSD amdgpu_pci_lookup doesn't do yet). TODO
-	 */
-	/* GC 11.0.1, Ryzen 7040 "Phoenix" - Radeon 740M / 760M / 780M */
-	{0x1002, 0x15BF, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_IP_DISCOVERY|AMD_IS_APU},
-	/* GC 11.0.4, Ryzen 7040 "Phoenix" - Radeon 740M */
-	{0x1002, 0x15C8, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_IP_DISCOVERY|AMD_IS_APU},
-	/* GC 11.0.1, Ryzen 8040 "Hawk Point" - Radeon 760M / 780M */
-	{0x1002, 0x1900, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_IP_DISCOVERY|AMD_IS_APU},
-	/* GC 11.0.4, Ryzen 8040 "Hawk Point" - Radeon 740M */
-	{0x1002, 0x1901, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_IP_DISCOVERY|AMD_IS_APU},
 
 	{ PCI_DEVICE(0x1002, PCI_ANY_ID),
 	  .class = PCI_CLASS_DISPLAY_VGA << 8,
@@ -3061,6 +3045,9 @@ const struct drm_driver amdgpu_partition_driver = {
 struct drm_driver *const amdgpu_drm_driver = &amdgpu_kms_driver;
 const struct pci_device_id *const amdgpu_device_ids = pciidlist;
 const size_t amdgpu_n_device_ids = __arraycount(pciidlist);
+const u16 *const amdgpu_unsupported_device_ids = amdgpu_unsupported_pciidlist;
+const size_t amdgpu_n_unsupported_device_ids =
+    __arraycount(amdgpu_unsupported_pciidlist);
 const int amdgpu_max_kms_ioctl = ARRAY_SIZE(amdgpu_ioctls_kms);
 
 #else  /* !__NetBSD__ */

@@ -7,9 +7,7 @@ of NetBSD 11.0. It's a minimal changeset, much of the stuff is disabled - e.g. A
 But it brings most of amdgpu driver from Linux 6.16.
 
 My card PCI ID is 0x1002 0x1900, but I suspect that this changeset
-works with other newer Radeons. If you want to give it a try you
-have to add your pci id in `sys/external/bsd/drm2/dist/drm/amd/amdgpu/amdgpu_drv.c`.
-Unlike Linux, wildcard probing is disabled.
+works with other newer Radeons.
 
 You will also need the newer amdgpu firmware from [here](https://gitlab.com/kernel-firmware/linux-firmware/-/tree/main/amdgpu?ref_type=heads).
 Just drop all the files there in `/libdata/firmware/amdgpu/`
@@ -22,6 +20,8 @@ You will also need to load the amdgpu module on boot, this is a `boot.cfg` entry
 You will need to at least rebuild and update the following:
  * kernel
  * modules: amdgpu drmkms_ttm drmkms_sched drmkms_pci drmkms drmkms_linux
+
+`./build.sh -j 24 -U -u kernel=GENERIC modules && sudo cp -v sys/arch/amd64/compile/obj/GENERIC/netbsd / && for i in amdgpu drmkms_ttm drmkms_sched drmkms_pci drmkms drmkms_linux; do sudo cp -v obj/destdir.amd64/stand/amd64/11.0/modules/${i}/${i}.kmod /stand/amd64/11.0/modules/${i} ; done`
 
 # DRI3
 

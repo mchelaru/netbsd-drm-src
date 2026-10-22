@@ -91,19 +91,42 @@ CFATTACH_DECL_NEW(amdgpu, sizeof(struct amdgpu_softc),
 extern struct drm_driver *const amdgpu_drm_driver;
 extern const struct pci_device_id *const amdgpu_device_ids;
 extern const size_t amdgpu_n_device_ids;
+extern const uint16_t *const amdgpu_unsupported_device_ids;
+extern const size_t amdgpu_n_unsupported_device_ids;
 
 static bool
 amdgpu_pci_lookup(const struct pci_attach_args *pa, unsigned long *flags)
 {
+	const uint16_t vendor = PCI_VENDOR(pa->pa_id);
+	const uint16_t device = PCI_PRODUCT(pa->pa_id);
+	const uint32_t class = pa->pa_class >> 8; /* Linux: no revision */
+	pcireg_t subsys;
+	uint16_t subvendor, subdevice;
 	size_t i;
 
+	/* old boards, let them for mach64/r128/radeon */
+	for (i = 0; i < amdgpu_n_unsupported_device_ids; i++) {
+		if (amdgpu_unsupported_device_ids[i] == device)
+			return false;
+	}
+
+	subsys = pci_conf_read(pa->pa_pc, pa->pa_tag, PCI_SUBSYS_ID_REG);
+	subvendor = PCI_SUBSYS_VENDOR(subsys);
+	subdevice = PCI_SUBSYS_ID(subsys);
+
 	for (i = 0; i < amdgpu_n_device_ids; i++) {
-		if ((PCI_VENDOR(pa->pa_id) == amdgpu_device_ids[i].vendor) &&
-		    (PCI_PRODUCT(pa->pa_id) == amdgpu_device_ids[i].device))
+		const struct pci_device_id *id = &amdgpu_device_ids[i];
+
+		if ((id->vendor == PCI_ANY_ID || id->vendor == vendor) &&
+		    (id->device == PCI_ANY_ID || id->device == device) &&
+		    (id->subvendor == PCI_ANY_ID ||
+			id->subvendor == subvendor) &&
+		    (id->subdevice == PCI_ANY_ID ||
+			id->subdevice == subdevice) &&
+		    !((id->class ^ class) & id->class_mask))
 			break;
 	}
 
-	/* Did we find it?  */
 	if (i == amdgpu_n_device_ids)
 		return false;
 

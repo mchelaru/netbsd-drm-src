@@ -74,11 +74,11 @@ struct pci_device_id {
 	unsigned long	driver_data;
 };
 
-#define	PCI_DEVICE(VENDOR, DEVICE)					      \
-	.vendor = (VENDOR),						      \
-	.device = (DEVICE)
-
 #define	PCI_ANY_ID		(~0)
+
+#define	PCI_DEVICE(VENDOR, DEVICE)					      \
+	.vendor = (VENDOR), .device = (DEVICE),				      \
+	.subvendor = PCI_ANY_ID, .subdevice = PCI_ANY_ID
 
 #define	PCI_BASE_CLASS_DISPLAY	PCI_CLASS_DISPLAY
 
