@@ -81,6 +81,7 @@ static void	amdgpu_attach_real(device_t);
 static int	amdgpu_detach(device_t, int);
 static bool	amdgpu_do_suspend(device_t, const pmf_qual_t *);
 static bool	amdgpu_do_resume(device_t, const pmf_qual_t *);
+static bool	amdgpu_do_shutdown(device_t, int);
 
 static void	amdgpu_task_work(struct work *, void *);
 
@@ -305,7 +306,8 @@ amdgpu_attach_real(device_t self)
 			    "amdgpu_fbdev_init failed: %d\n", error);
 	}
 
-	if (!pmf_device_register(self, &amdgpu_do_suspend, &amdgpu_do_resume))
+	if (!pmf_device_register1(self, &amdgpu_do_suspend, &amdgpu_do_resume,
+	    &amdgpu_do_shutdown))
 		aprint_error_dev(self, "unable to establish power handler\n");
 
 	/*
@@ -385,6 +387,27 @@ amdgpu_detach(device_t self, int flags)
 	linux_pci_dev_destroy(&sc->sc_pci_dev);
 
 	return 0;
+}
+
+static bool
+amdgpu_do_shutdown(device_t self, int howto)
+{
+	struct amdgpu_softc *const sc = device_private(self);
+	struct drm_device *const dev = sc->sc_drm_dev;
+	struct amdgpu_device *adev;
+
+	if (dev == NULL || !sc->sc_kms_loaded)
+		return true;
+
+	adev = drm_to_adev(dev);
+	if (amdgpu_ras_intr_triggered())
+		return true;
+
+	if (!amdgpu_passthrough(adev))
+		adev->mp1_state = PP_MP1_STATE_UNLOAD;
+	amdgpu_device_ip_suspend(adev);
+	adev->mp1_state = PP_MP1_STATE_NONE;
+	return true;
 }
 
 static bool

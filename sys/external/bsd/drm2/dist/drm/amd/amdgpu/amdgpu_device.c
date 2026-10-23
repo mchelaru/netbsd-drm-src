@@ -1532,8 +1532,56 @@ void amdgpu_device_pci_config_reset(struct amdgpu_device *adev)
 int amdgpu_device_pci_reset(struct amdgpu_device *adev)
 {
 #ifdef __NetBSD__
-	(void)adev;
-	return -ENOTSUP;
+	struct pci_dev *pdev = adev->pdev;
+	pci_chipset_tag_t pc = pdev->pd_pa.pa_pc;
+	pcitag_t tag = pdev->pd_pa.pa_tag;
+	bool did_save = false;
+	int pm_off, delay;
+	uint32_t pmcsr, id;
+
+	 /* from linux pci_pm_reset() */
+	if (pci_get_capability(pc, tag, PCI_CAP_PWRMGMT, &pm_off, NULL) == 0)
+		return -ENOTSUP;
+
+	pmcsr = pci_conf_read(pc, tag, pm_off + PCI_PMCSR);
+	if (pmcsr & PCI_PMCSR_NO_SOFTRST)
+		return -ENOTSUP;
+
+	if (pdev->pd_saved_state == NULL) {
+		pci_save_state(pdev);
+		did_save = true;
+	}
+
+	pci_clear_master(pdev);
+
+	pmcsr &= ~PCI_PMCSR_STATE_MASK;
+	pmcsr |= PCI_PMCSR_STATE_D3;
+	pci_conf_write(pc, tag, pm_off + PCI_PMCSR, pmcsr);
+	msleep(10);
+
+	pmcsr &= ~PCI_PMCSR_STATE_MASK;
+	pmcsr |= PCI_PMCSR_STATE_D0;
+	pci_conf_write(pc, tag, pm_off + PCI_PMCSR, pmcsr);
+	msleep(10);
+
+	for (delay = 0; delay < 60000; delay += 10) {
+		pci_read_config_dword(pdev, 0, &id);
+		if (!PCI_POSSIBLE_ERROR(id))
+			break;
+		msleep(10);
+	}
+	if (PCI_POSSIBLE_ERROR(id)) {
+		dev_err(adev->dev, "amdgpu_pci_reset: device not ready\n");
+		if (did_save)
+			pci_restore_state(pdev);
+		return -ETIMEDOUT;
+	}
+
+	if (did_save)
+		pci_restore_state(pdev);
+
+	dev_info(adev->dev, "amdgpu_pci_reset: success\n");
+	return 0;
 #else
 	return pci_reset_function(adev->pdev);
 #endif
@@ -2953,6 +3001,17 @@ static int amdgpu_device_ip_init(struct amdgpu_device *adev)
 	r = amdgpu_ras_init(adev);
 	if (r)
 		return r;
+
+#ifdef __NetBSD__
+	/* reset before any hw_init otherwise it might hang */
+	if (!amdgpu_sriov_vf(adev)) {
+		r = amdgpu_device_pci_reset(adev);
+		if (r)
+			dev_warn(adev->dev,
+				 "early PCI reset failed: %d (continuing)\n",
+				 r);
+	}
+#endif
 
 	for (i = 0; i < adev->num_ip_blocks; i++) {
 		if (!adev->ip_blocks[i].status.valid)
