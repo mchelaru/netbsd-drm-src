@@ -1,4 +1,4 @@
-#	$NetBSD: 3RDPARTY,v 1.2126.2.17 2026/10/02 11:57:15 martin Exp $
+#	$NetBSD: 3RDPARTY,v 1.2126.2.20 2026/10/30 19:01:28 martin Exp $
 #
 # This file contains a list of the software that has been integrated into
 # NetBSD where we are not the primary maintainer.
@@ -1083,12 +1083,12 @@ Notes:
 Patch applied after OpenSSH import.
 
 Package:	OpenSSH
-Version:	10.3
-Current Vers:	10.3 / portable 10.3p1
+Version:	10.6
+Current Vers:	10.6 / portable 10.6p1
 Maintainer:	OpenSSH
 Archive Site:	http://www.openssh.com/ftp.html
 Home Page:	http://www.openssh.com/portable.html
-Date:		2026-04-08
+Date:		2026-10-07
 Mailing List:	openssh-unix-announce@mindrot.org
 Responsible:	thorpej, christos, elric
 License:	BSD. See src/crypto/external/bsd/openssh/dist/LICENSE
@@ -1459,14 +1459,14 @@ Location:	external/bsd/tradcpp
 Notes:
 
 Package:	tz
-Version:	tzcode2025b / tzdata2026egtz
-Current Vers:	tzcode2026e / tzdata2026e
+Version:	tzcode2026e / tzdata2026fgtz
+Current Vers:	tzcode2026f / tzdata2026f
 Maintainer:	Paul Eggert <eggert@cs.ucla.edu>
 Archive Site:	ftp://ftp.iana.org/tz/releases/
 Archive Site:	ftp://munnari.oz.au/pub/oldtz/
 Old Archive Site:	ftp://elsie.nci.nih.gov/pub/
 Home Page:	http://www.iana.org/time-zones
-Date:		2026-10-01
+Date:		2026-10-29
 Mailing List:	tz@iana.org
 Responsible:	kleink, christos, kre
 License:	Public domain
@@ -2380,12 +2380,12 @@ Location:	share/wscons/fonts
 Notes:
 
 Package:	mozilla-certdata
-Version:	2024-08-23 (872bd5fefe12bc48a9c65e9ea7f189df243d835a)
-Current Vers:	2025-01-23 (d348a62fd98df78bceaf6ce066bafad6e9f272b2)
+Version:	2026-10-20 (26d38a0c3fb81e7fb2acedbaf4c42dd21dce0517)
+Current Vers:	2026-10-20 (26d38a0c3fb81e7fb2acedbaf4c42dd21dce0517)
 Maintainer:	Mozilla
 Archive Site:	https://hg.mozilla.org/projects/nss/log/tip/lib/ckfw/builtins/certdata.txt
 Home Page:	https://wiki.mozilla.org/CA
-Date:		2025-01-31
+Date:		2026-10-20
 Mailing List:
 License:	MPL
 Responsible:	riastradh, security-team
