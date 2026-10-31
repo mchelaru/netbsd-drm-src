@@ -6153,17 +6153,30 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 #ifdef __NetBSD__
 		/*
 		 * TDR runs on the ordered system_wq. Force-signal HW fences
-		 * before drm_sched_stop (which waits on finished fences) so
+		 * before clear_job_fences and drm_sched_stop (which waits on finished fences) so
 		 * we cannot deadlock the wq and leave syncobj waiters asleep
 		 * when recovery stalls
 		 */
 		for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
 			struct amdgpu_ring *ring = tmp_adev->rings[i];
+			struct drm_sched_job *s_job;
 
 			if (!ring || !ring->fence_drv.initialized)
 				continue;
-			amdgpu_fence_driver_clear_job_fences(ring);
 			amdgpu_fence_driver_force_completion(ring);
+			amdgpu_fence_driver_clear_job_fences(ring);
+
+			if (!amdgpu_ring_sched_ready(ring))
+				continue;
+			list_for_each_entry(s_job, &ring->sched.pending_list,
+					    list) {
+				struct drm_sched_fence *sf = s_job->s_fence;
+
+				if (!sf || dma_fence_is_signaled(&sf->finished))
+					continue;
+				dma_fence_set_error(&sf->finished, -ECANCELED);
+				dma_fence_signal(&sf->finished);
+			}
 		}
 #endif
 

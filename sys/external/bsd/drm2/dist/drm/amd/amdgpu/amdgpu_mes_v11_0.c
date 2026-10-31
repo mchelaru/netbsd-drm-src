@@ -1663,29 +1663,21 @@ static int mes_v11_0_hw_fini(struct amdgpu_ip_block *ip_block)
 		amdgpu_bo_free_kernel(&adev->mes.resource_1, &adev->mes.resource_1_gpu_addr,
 					&adev->mes.resource_1_addr);
 	}
+#ifdef __NetBSD__
+	/* force reinit */
+	adev->mes.ring[0].sched.ready = false;
+#endif
 	return 0;
 }
 
 static int mes_v11_0_suspend(struct amdgpu_ip_block *ip_block)
 {
-	int r;
-
-	r = amdgpu_mes_suspend(ip_block->adev);
-	if (r)
-		return r;
-
 	return mes_v11_0_hw_fini(ip_block);
 }
 
 static int mes_v11_0_resume(struct amdgpu_ip_block *ip_block)
 {
-	int r;
-
-	r = mes_v11_0_hw_init(ip_block);
-	if (r)
-		return r;
-
-	return amdgpu_mes_resume(ip_block->adev);
+	return mes_v11_0_hw_init(ip_block);
 }
 
 static int mes_v11_0_early_init(struct amdgpu_ip_block *ip_block)
