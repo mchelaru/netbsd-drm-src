@@ -995,6 +995,9 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 	if (adev->flags & AMD_IS_APU) {
 		init_data.flags.seamless_boot_edp_requested = true;
 		init_data.flags.allow_seamless_boot_optimization = true;
+#ifdef __NetBSD__
+		init_data.flags.netbsd_hubp_takeover_pending = true;
+#endif
 	}
 
 	init_data.dcn_reg_offsets = (uint32_t *)adev->reg_offset[DCE_HWIP][0];

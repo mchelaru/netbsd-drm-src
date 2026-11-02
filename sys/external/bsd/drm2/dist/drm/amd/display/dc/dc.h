@@ -473,6 +473,13 @@ struct dc_config {
 	bool consolidated_dpia_dp_lt;
 	bool set_pipe_unlock_order;
 	bool enable_dpia_pre_training;
+#ifdef __NetBSD__
+	/*
+	 * One-shot: force full HUBP takeover from VBIOS/GOP after seamless
+	 * boot skips init_pipes.  Cleared after the first successful force.
+	 */
+	bool netbsd_hubp_takeover_pending;
+#endif
 };
 
 enum visual_confirm {

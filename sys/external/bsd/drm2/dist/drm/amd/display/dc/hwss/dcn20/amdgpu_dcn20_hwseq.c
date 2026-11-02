@@ -2081,29 +2081,36 @@ void dcn20_program_front_end_for_ctx(
 	/*
 	 * Seamless + skipped init_pipes: detect_pipe_changes can leave the
 	 * live VBIOS pipe without enable/addr_update, so HUBP keeps scanning
-	 * GOP (white/black) while we paint a GTT BO.  Force a full plane
-	 * reprogram whenever a plane is attached.
+	 * GOP while we paint.  Force a full plane reprogram once to take over.
 	 */
-	for (i = 0; i < dc->res_pool->pipe_count; i++) {
-		pipe = &context->res_ctx.pipe_ctx[i];
-		if (!pipe->plane_state)
-			continue;
-		pipe->update_flags.bits.enable = 1;
-		pipe->update_flags.bits.plane_changed = 1;
-		pipe->update_flags.bits.mpcc = 1;
-		pipe->update_flags.bits.scaler = 1;
-		pipe->update_flags.bits.viewport = 1;
-		pipe->plane_state->update_flags.bits.addr_update = 1;
-		pipe->plane_state->update_flags.bits.full_update = 1;
-		printk(KERN_INFO
-		    "amdgpu: fe_force pipe=%d hubp=%d plane=%p addr=0x%llx "
-		    "flags=0x%x\n",
-		    pipe->pipe_idx,
-		    pipe->plane_res.hubp ? pipe->plane_res.hubp->inst : -1,
-		    pipe->plane_state,
-		    (unsigned long long)
-			pipe->plane_state->address.grph.addr.quad_part,
-		    pipe->update_flags.raw);
+	if (dc->config.netbsd_hubp_takeover_pending) {
+		bool did_force = false;
+
+		for (i = 0; i < dc->res_pool->pipe_count; i++) {
+			pipe = &context->res_ctx.pipe_ctx[i];
+			if (!pipe->plane_state)
+				continue;
+			pipe->update_flags.bits.enable = 1;
+			pipe->update_flags.bits.plane_changed = 1;
+			pipe->update_flags.bits.mpcc = 1;
+			pipe->update_flags.bits.scaler = 1;
+			pipe->update_flags.bits.viewport = 1;
+			pipe->plane_state->update_flags.bits.addr_update = 1;
+			pipe->plane_state->update_flags.bits.full_update = 1;
+			did_force = true;
+			printk(KERN_INFO
+			    "amdgpu: fe_force(takeover) pipe=%d hubp=%d "
+			    "plane=%p addr=0x%llx flags=0x%x\n",
+			    pipe->pipe_idx,
+			    pipe->plane_res.hubp ?
+				pipe->plane_res.hubp->inst : -1,
+			    pipe->plane_state,
+			    (unsigned long long)
+				pipe->plane_state->address.grph.addr.quad_part,
+			    pipe->update_flags.raw);
+		}
+		if (did_force)
+			dc->config.netbsd_hubp_takeover_pending = false;
 	}
 #endif
 
@@ -2765,16 +2772,21 @@ void dcn20_update_plane_addr(const struct dc *dc, struct pipe_ctx *pipe_ctx)
 	 * + skipped init_pipes that completion never arrives and HUBP keeps
 	 * scanning GOP (white) while we paint GTT.
 	 */
-	plane_state->flip_immediate = true;
-	printk(KERN_INFO
-	    "amdgpu: hubp_flip(dcn20) pipe=%d hubp=%d addr=0x%llx imm=%d "
-	    "visible=%d enable=%d\n",
-	    pipe_ctx->pipe_idx,
-	    pipe_ctx->plane_res.hubp ? pipe_ctx->plane_res.hubp->inst : -1,
-	    (unsigned long long)plane_state->address.grph.addr.quad_part,
-	    plane_state->flip_immediate ? 1 : 0,
-	    plane_state->visible ? 1 : 0,
-	    pipe_ctx->update_flags.bits.enable ? 1 : 0);
+	if (pipe_ctx->update_flags.bits.enable)
+		plane_state->flip_immediate = true;
+	if (pipe_ctx->update_flags.bits.enable ||
+	    plane_state->flip_immediate)
+		printk(KERN_INFO
+		    "amdgpu: hubp_flip(dcn20) pipe=%d hubp=%d addr=0x%llx "
+		    "imm=%d visible=%d enable=%d\n",
+		    pipe_ctx->pipe_idx,
+		    pipe_ctx->plane_res.hubp ?
+			pipe_ctx->plane_res.hubp->inst : -1,
+		    (unsigned long long)
+			plane_state->address.grph.addr.quad_part,
+		    plane_state->flip_immediate ? 1 : 0,
+		    plane_state->visible ? 1 : 0,
+		    pipe_ctx->update_flags.bits.enable ? 1 : 0);
 #endif
 
 	pipe_ctx->plane_res.hubp->funcs->hubp_program_surface_flip_and_addr(
