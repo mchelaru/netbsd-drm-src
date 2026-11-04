@@ -235,8 +235,19 @@ static void gmc_v11_0_flush_gpu_tlb(struct amdgpu_device *adev, uint32_t vmid,
 	/* This is necessary for SRIOV as well as for GFXOFF to function
 	 * properly under bare metal
 	 */
+#ifdef __NetBSD__
+	/*
+	 * Prefer MMIO over MES. The latter is sometimes freezing my display
+	 * for two seconds. Maybe this works better with kiq but Phoenix is
+	 * enabling mes_kiq during auto discovery, so that's no good.
+	 * TODO: put this behaviour under a sysctl.
+	 */
+	if (adev->gfx.kiq[0].ring.sched.ready &&
+	    (amdgpu_sriov_runtime(adev) || !amdgpu_sriov_vf(adev))) {
+#else
 	if ((adev->gfx.kiq[0].ring.sched.ready || adev->mes.ring[0].sched.ready) &&
 	    (amdgpu_sriov_runtime(adev) || !amdgpu_sriov_vf(adev))) {
+#endif
 		amdgpu_gmc_fw_reg_write_reg_wait(adev, req, ack, inv_req,
 						 1 << vmid, GET_INST(GC, 0));
 		return;
